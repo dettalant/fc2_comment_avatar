@@ -51,8 +51,18 @@ var fc2_comment_avatar = (function (exports) {
               // アバターコードを示す両端の文字烈が見つからなかった場合は次の周回へ
               continue;
           }
-          // アバターネーム候補を切り出す
-          var avatarName = code.slice(2, -2);
+          // # 正規表現マッチ条件
+          // * "[["と"]]"に囲われた最初の対象にマッチ
+          // * 空白と"["と"]"を含めない文字列を
+          // * `[[ foo ]]`のように空白をつけた記述をされていても取り出す
+          // * 空白は半角/全角両方を対象とする
+          var regex = /\[\[[\s　]*?([^\[\]\s　]+?)[\s　]*?\]\]/;
+          var avatarNameArray = regex.exec(code);
+          // マッチしなければ次周回へ
+          if (avatarNameArray === null) {
+              continue;
+          }
+          var avatarName = avatarNameArray[1];
           if (this.isMatchAvatarName(avatarName)) {
               // 切り出したアバターネームが登録されていた場合は、
               // アバターデータを生成して配列に入れる

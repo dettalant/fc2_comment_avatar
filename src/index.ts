@@ -98,8 +98,20 @@ export class CommentAvatar implements CommentAvatarArgs {
         continue;
       }
 
-      // アバターネーム候補を切り出す
-      const avatarName = code.slice(2, -2);
+      // # 正規表現マッチ条件
+      // * "[["と"]]"に囲われた最初の対象にマッチ
+      // * 空白と"["と"]"を含めない文字列を
+      // * `[[ foo ]]`のように空白をつけた記述をされていても取り出す
+      // * 空白は半角/全角両方を対象とする
+      const regex = /\[\[[\s　]*?([^\[\]\s　]+?)[\s　]*?\]\]/;
+
+      const avatarNameArray = regex.exec(code);
+      // マッチしなければ次周回へ
+      if (avatarNameArray === null) {
+        continue;
+      }
+
+      const avatarName = avatarNameArray[1];
       if (this.isMatchAvatarName(avatarName)) {
         // 切り出したアバターネームが登録されていた場合は、
         // アバターデータを生成して配列に入れる
