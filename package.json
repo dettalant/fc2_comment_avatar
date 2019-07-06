@@ -1,0 +1,19 @@
+{
+  "name": "fc2_comment_abatar",
+  "version": "0.1.0",
+  "main": "fc2_comment_abatar.js",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "yarn run build:development && yarn run build:production",
+    "build:development": "rollup -c",
+    "build:production": "NODE_ENV=production rollup -c"
+  },
+  "devDependencies": {
+    "rollup": "^1.16.6",
+    "rollup-plugin-buble": "^0.19.8",
+    "rollup-plugin-typescript2": "^0.21.2",
+    "rollup-plugin-uglify": "^6.0.2",
+    "typescript": "^3.5.2"
+  }
+}
