@@ -2,17 +2,40 @@ import typescript from "rollup-plugin-typescript2";
 import buble from "rollup-plugin-buble";
 import { uglify } from "rollup-plugin-uglify";
 
+
+const scriptArgs = {
+  name: process.env.npm_package_name,
+  version: process.env.npm_package_version,
+  license: process.env.npm_package_license,
+  repoUrl: "https://github.com/dettalant/fc2_comment_avatar| dettalant/fc2_comment_avatar",
+}
+
+const bannerComment = `/*!
+ * @file ${scriptArgs.name}.js
+ * See {@link ${scriptArgs.repoUrl}}
+ *
+ * @author dettalant
+ * @version v${scriptArgs.version}
+ * @license ${scriptArgs.license} License
+ */`;
+
 const plugins = [
   typescript(),
   buble(),
 ];
 
-let fileName = "./dist/fc2_comment_avatar";
-
+let fileName = "./dist/" + scriptArgs.name;
 if (process.env.NODE_ENV === "production") {
   // for production build
   fileName += ".min";
-  plugins.push(uglify())
+
+  const uglifyArgs = {
+    output: {
+      comments: "some"
+    }
+  };
+
+  plugins.push(uglify(uglifyArgs));
 }
 
 export default {
@@ -20,7 +43,8 @@ export default {
   output: {
     file: fileName + ".js",
     format: "iife",
-    name: "fc2_comment_avatar",
+    name: scriptArgs.name,
+    banner: bannerComment,
   },
   plugins
 };
