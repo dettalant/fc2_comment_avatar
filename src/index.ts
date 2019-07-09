@@ -5,9 +5,11 @@ const DEVICE_CLICK_EVENT_TYPE = (window.ontouchend === null) ? "touchend" : "cli
 const DEFAULT_AVATAR_KEY = "__default__";
 // 管理者アバターを指し示す名前
 const ADMIN_AVATAR_KEY = "__admin__";
+// ローカルストレージ登録に使用するkey name
+const LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
 
 class CommentAvatarError implements Error {
-  public name = "NavManagerError";
+  public name = "CommentAvatarError";
 
   constructor(public message: string) {}
 
@@ -25,6 +27,8 @@ interface CommentAvatarArgs {
   avatarClassName: string;
   // アバター画像クラス名
   avatarImgClassName: string;
+  // メールアドレス入力欄クラス名
+  emailInputId: string;
   // url書き換え先としてdata-src属性を使用するか否か
   // lazyloadなどでdata-srcを用いるならtrue、用いないならfalse
   isUseDataSrc?: boolean;
@@ -64,6 +68,8 @@ export class CommentAvatar implements CommentAvatarArgs {
   avatarSelectButton: HTMLElement;
   avatarSelectButtonId: string;
   avatarSelectButtonImg: HTMLImageElement;
+  emailInputId: string = "mail";
+  emailInput: HTMLInputElement;
   // 初期値ではdata-src属性を使用しない
   isUseDataSrc: boolean = false;
   // 独自のデフォルト画像を使用する場合はtrue
@@ -86,6 +92,11 @@ export class CommentAvatar implements CommentAvatarArgs {
       throw new CommentAvatarError("アバター選択ボタン要素の取得に失敗しました");
     }
 
+    const emailInput = document.getElementById(initArgs.emailInputId);
+    if (emailInput === null || !(emailInput instanceof HTMLInputElement)) {
+      throw new CommentAvatarError("メールアドレス入力欄の取得に失敗しました");
+    }
+
     // キャストは怖いがこればかりは仕方がない
     this.avatarContainers = avatars as HTMLCollectionOf<HTMLElement>;
     this.avatarClassName = initArgs.avatarClassName;
@@ -93,6 +104,10 @@ export class CommentAvatar implements CommentAvatarArgs {
     this.avatarsList = this.avatarsListFormat(initArgs.avatarsList);
     this.avatarSelectButton = avatarSelectButton;
     this.avatarSelectButtonId = initArgs.avatarSelectButtonId;
+
+    this.emailInputId = initArgs.emailInputId;
+    this.emailInput = emailInput;
+
     if (initArgs.isUseDataSrc) {
       // useDataSrc項目がtrueである場合のみ上書き
       this.isUseDataSrc = initArgs.isUseDataSrc;
@@ -176,9 +191,24 @@ export class CommentAvatar implements CommentAvatarArgs {
         const buttonEl = document.createElement("button");
         buttonEl.type = "button";
         buttonEl.className = "comment_form_avatar_select_button";
+
+        // アバターがクリック選択された際の処理
         elAddClickEvent(buttonEl, () => {
-          // TODO: ここにメールアドレス欄ジャック処理を入れる
-          console.log("click: " + avatar.name);
+          // メールアドレス欄ジャック処理
+          let emailValue = "";
+          if (avatar.name !== DEFAULT_AVATAR_KEY) {
+            // デフォルト画像以外の場合のみアバターコードを入れる
+            emailValue = "[[" + avatar.name + "]]";
+          }
+
+          // email欄の書き換え
+          this.emailInput.value = emailValue;
+
+          // TODO: ここでローカルストレージ欄の書き換え
+          localStorage.setItem(LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
+
+          // 直接画像src欄を書き換え
+          this.avatarSelectButtonImg.src = avatar.url;
         })
 
         // ボタン要素に入れる画像の用意
@@ -202,8 +232,28 @@ export class CommentAvatar implements CommentAvatarArgs {
     // デフォルトアバターを生成
     const avatarData = this.defaultAvatarData;
 
-    // TODO: この部分でlocalStorage情報を取得して、
+    // localStorageに記録していたアバターコードを取得して、
     // ユーザーが以前設定していたアバターに戻す
+    const storeAvatarCode = localStorage.getItem(LOCALSTORAGE_AVATAR_CODE_KEY);
+    if (storeAvatarCode !== null && storeAvatarCode !== "") {
+      // アバターコードからアバター名を取り出す
+      const avatarName = this.avatarCodeParse(storeAvatarCode);
+
+      // 念の為アバターとして登録されているか確認してから処理を始める
+      if (this.isMatchAvatarName(avatarName)) {
+        // メールアドレス欄にアバターコードを入力
+        this.emailInput.value = storeAvatarCode;
+
+        // アバター選択ボタン画像の表示対象を書き換え
+        this.avatarDataOverWrite(
+          avatarData,
+          avatarImg,
+          avatarName,
+          this.getAvatarSrcUrl(avatarName),
+        );
+      }
+
+    }
 
     // 画像情報を書き換える
     avatarData.imgEl = avatarImg;
@@ -298,7 +348,7 @@ export class CommentAvatar implements CommentAvatarArgs {
           // names
           adminAvatarName,
           // url
-          this.avatarsList[adminAvatarName]
+          this.getAvatarSrcUrl(adminAvatarName)
         );
         avatarsData.push(avatarData);
 
@@ -320,21 +370,11 @@ export class CommentAvatar implements CommentAvatarArgs {
         continue;
       }
 
-      // # 正規表現マッチ条件
-      // * "[["と"]]"に囲われた最初の対象にマッチ
-      // * 空白と"["と"]"を含めない文字列を
-      // * `[[ foo ]]`のように空白をつけた記述をされていても取り出す
-      // * 空白は半角/全角両方を対象とする
-      const regex = /\[\[[\s　]*?([^\[\]\s　]+?)[\s　]*?\]\]/;
-
-      const avatarNameArray = regex.exec(code);
-      // マッチしなければ次周回へ
-      if (avatarNameArray === null) {
+      const avatarName = this.avatarCodeParse(code);
+      if (avatarName === "") {
+        // マッチしなかった場合は次周回へ
         continue;
-      }
-
-      const avatarName = avatarNameArray[1];
-      if (this.isMatchAvatarName(avatarName)) {
+      } else if (this.isMatchAvatarName(avatarName)) {
         // 切り出したアバターネームが登録されていた場合は、
         // アバターデータを生成して配列に入れる
         const avatarData = this.avatarDataOverWrite(
@@ -342,7 +382,7 @@ export class CommentAvatar implements CommentAvatarArgs {
           // querySelectorでクラス名検索しているので"."を忘れないこと
           avatar.querySelector("." + this.avatarImgClassName),
           avatarName,
-          this.avatarsList[avatarName]
+          this.getAvatarSrcUrl(avatarName),
         )
 
         avatarsData.push(avatarData);
@@ -350,6 +390,28 @@ export class CommentAvatar implements CommentAvatarArgs {
     }
 
     return avatarsData;
+  }
+
+  /**
+   * アバターコードを読み取って内包されるアバター名を返す
+   * @param  avatarCode アバター指定コード
+   * @return            アバター名
+   */
+  avatarCodeParse(avatarCode: string): string {
+    // # 正規表現マッチ条件
+    // * "[["と"]]"に囲われた最初の対象にマッチ
+    // * 空白と"["と"]"を含めない文字列を
+    // * `[[ foo ]]`のように空白をつけた記述をされていても取り出す
+    // * 空白は半角/全角両方を対象とする
+    const regex = /\[\[[\s　]*?([^\[\]\s　]+?)[\s　]*?\]\]/;
+
+    const avatarNameArray = regex.exec(avatarCode);
+    if (avatarNameArray === null || avatarNameArray.length < 2) {
+      // マッチしなかった場合、もしくは何らかの問題で部分取得ができなかった場合は空欄を返す
+      return "";
+    }
+
+    return avatarNameArray[1]
   }
 
   /**
@@ -372,7 +434,7 @@ export class CommentAvatar implements CommentAvatarArgs {
     return {
       imgEl: null,
       name: defaultAvatarName,
-      url: this.avatarsList[defaultAvatarName],
+      url: this.getAvatarSrcUrl(defaultAvatarName),
     }
   }
 
@@ -398,17 +460,26 @@ export class CommentAvatar implements CommentAvatarArgs {
         continue;
       }
 
-      const avatar = this.avatarDataOverWrite(
-        this.defaultAvatarData,
-        null,
-        avatarName,
-        this.avatarsList[avatarName]
-      );
+      const avatar: AvatarData = {
+        imgEl: null,
+        name: avatarName,
+        url: this.getAvatarSrcUrl(avatarName)
+      };
 
       userAvatars.push(avatar);
     }
 
     return userAvatars
+  }
+
+  /**
+   * avatarsListが内包するUrlを返す。もしアバター名でurlが引き出せなければ空欄を返す
+   * @param  avatarName urlを取り出したいアバター名
+   * @return            アバター名と紐付けられた画像url
+   */
+  getAvatarSrcUrl(avatarName: string): string {
+    const url = this.avatarsList[avatarName];
+    return (url === undefined) ? "" : url;
   }
 
   /**
