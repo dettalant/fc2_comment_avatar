@@ -20,6 +20,8 @@ interface CommentAvatarArgs {
   // url書き換え先としてdata-src属性を使用するか否か
   // lazyloadなどでdata-srcを用いるならtrue、用いないならfalse
   isUseDataSrc?: boolean;
+  // 管理者コメントに専用アバターを付与するか否か
+  isUseAdminAvatar?: boolean;
   // アバター画像をまとめてobjectとして登録
   // key: アバター指定コード
   // value: アバター画像url
@@ -56,6 +58,9 @@ export class CommentAvatar implements CommentAvatarArgs {
   avatarSelectButtonImg: HTMLImageElement;
   // 初期値ではdata-src属性を使用しない
   isUseDataSrc: boolean = false;
+  // 独自のデフォルト画像を使用する場合はtrue
+  isUseCustomDefaultImg: boolean = false;
+  isUseAdminAvatar: boolean = true;
   avatarsList: AvatarsList;
   constructor(initArgs?: CommentAvatarArgs) {
     if (initArgs === undefined) {
@@ -77,12 +82,17 @@ export class CommentAvatar implements CommentAvatarArgs {
     this.avatarContainers = avatars as HTMLCollectionOf<HTMLElement>;
     this.avatarClassName = initArgs.avatarClassName;
     this.avatarImgClassName = initArgs.avatarImgClassName;
-    this.avatarsList = initArgs.avatarsList;
+    this.avatarsList = this.avatarsListFormat(initArgs.avatarsList);
     this.avatarSelectButton = avatarSelectButton;
     this.avatarSelectButtonId = initArgs.avatarSelectButtonId;
     if (initArgs.isUseDataSrc) {
       // useDataSrc項目がtrueである場合のみ上書き
       this.isUseDataSrc = initArgs.isUseDataSrc;
+    }
+
+    if (initArgs.isUseAdminAvatar === false) {
+      // 管理者コメントを無効化する設定がなされている場合のみ上書き
+      this.isUseAdminAvatar = initArgs.isUseAdminAvatar;
     }
 
     // アバター選択ボタンにデフォルト画像を追加
@@ -97,41 +107,113 @@ export class CommentAvatar implements CommentAvatarArgs {
   }
 
   /**
+   * avatarsListを内部で扱いやすく整形する
+   * @param  avatarsList 外部から入力されたavatarsList
+   * @return             整形後のavatarsList
+   */
+  avatarsListFormat(avatarsList: AvatarsList): AvatarsList {
+    const defaultName = "__default__";
+    const adminName = "__admin__";
+
+    if (avatarsList[defaultName] === undefined) {
+      // default画像が設定されていないなら追加する
+      avatarsList[defaultName] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
+    } else {
+      // default画像が設定されていたら書き換え対象を増やすフラグをtrueに
+      this.isUseCustomDefaultImg = true;
+    }
+
+    if (avatarsList[adminName] === undefined) {
+      // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
+      this.isUseAdminAvatar = false;
+    }
+
+    return avatarsList;
+  }
+
+  /**
    * アバター選択ボタンを初期化する変数
    * @param  el アバター選択ボタンとなる空要素
    * @return 現在選択中のアバター画像を表示するimg要素
    */
   avatarSelectButtonInit(el: HTMLElement): HTMLImageElement {
+    const elArray = [];
+
+    // 配列内の全てのHTMLElementをel内にぶっこむ
+    const elAppendChilds = (el: HTMLElement, elArray: HTMLElement[]) => {
+      const elArrayLen = elArray.length;
+      for (let i = 0; i < elArrayLen; i++) {
+        el.appendChild(elArray[i]);
+      }
+    }
+
     const avatarImg = document.createElement("img");
     avatarImg.className = "comment_avatar_img lazyload";
 
     // デフォルトアバターを生成
     const avatarData = this.genDefaultAvatarData();
 
-    // TODO: この部分でCookie情報を取得して、
-    // 以前設定していたアバターに戻す
+    // TODO: この部分でlocalStorage情報を取得して、
+    // ユーザーが以前設定していたアバターに戻す
 
     // 画像情報を書き換える
     avatarData.imgEl = avatarImg;
-    this.avatarImgOverWrite(avatarData)
+    this.avatarImgOverWrite(avatarData);
 
     const avatarImgWrapper = document.createElement("div");
     avatarImgWrapper.className = "comment_form_avatar_img_wrapper";
     avatarImgWrapper.appendChild(avatarImg);
-
     // アバター選択ボタン内に画像を配置
-    el.appendChild(avatarImgWrapper);
+    elArray.push(avatarImgWrapper);
 
+    // ボタンテキストを配置
     const buttonText = el.dataset.buttonText;
     if (buttonText !== undefined) {
       // `data-button-text`が空欄でなければspan要素として追加する
       const avatarButtonText = document.createElement("span");
       avatarButtonText.className = "comment_form_avatar_button_text";
       avatarButtonText.innerText = buttonText;
-      el.appendChild(avatarButtonText);
+      elArray.push(avatarButtonText)
     }
 
+    const avatarSelectContainer = document.createElement("div");
+    avatarSelectContainer.className = "comment_form_avatar_select_container";
+    elArray.push(avatarSelectContainer);
+
+    // 配列内の要素を順番にelへと入れる
+    elAppendChilds(el, elArray);
+
     return avatarImg;
+  }
+
+  /**
+   * アバターデータを上書きして返す関数
+   * 引数のnameとurlは省略可能。その場合はデフォルトの値を使用する
+   * @param  avatarData 書き換えるアバターデータ
+   * @param  imgEl      アバターデータと紐付ける画像要素
+   * @param  name       アバターネーム
+   * @param  url        アバター画像url
+   * @return            書き換え後のアバターデータ
+   */
+  avatarDataOverWrite(
+    avatarData: AvatarData,
+    imgEl: HTMLElement | HTMLImageElement | null,
+    name?: string,
+    url?: string
+  ): AvatarData {
+    if (imgEl instanceof HTMLImageElement) {
+      avatarData.imgEl = imgEl;
+    }
+
+    if (name !== undefined) {
+      avatarData.name = name;
+    }
+
+    if (url !== undefined) {
+      avatarData.url = url;
+    }
+
+    return avatarData;
   }
 
   /**
@@ -145,10 +227,39 @@ export class CommentAvatar implements CommentAvatarArgs {
     for (let i = 0; i < avatarContainersLen; i++) {
       const avatar = this.avatarContainers[i];
       const code = avatar.dataset.avatarCode;
-      if (code === undefined) {
+      const isAdminAvatar = avatar.dataset.isAdminAvatar
+
+      if (this.isUseAdminAvatar && isAdminAvatar) {
+        // 管理者アバターを使用する設定でいて、
+        // 管理者コメントの場合は無条件で管理者アバターを使用する
+        const adminAvatarName = "__admin__";
+        const avatarData = this.avatarDataOverWrite(
+          // avatarData
+          this.genDefaultAvatarData(),
+          // imgEl
+          avatar.querySelector("." + this.avatarImgClassName),
+          // names
+          adminAvatarName,
+          // url
+          this.avatarsList[adminAvatarName]
+        );
+        avatarsData.push(avatarData);
+
         continue;
-      } else if (code.indexOf("[[") === -1 && code.indexOf("]]") === -1) {
-        // アバターコードを示す両端の文字烈が見つからなかった場合は次の周回へ
+      }
+
+      if (code === undefined ||
+          code.indexOf("[[") === -1 && code.indexOf("]]") === -1)
+      {
+        if (this.isUseCustomDefaultImg) {
+          // custom default画像フラグが有効なら書き換え
+          const avatarData = this.avatarDataOverWrite(
+            this.genDefaultAvatarData(),
+            avatar.querySelector("." + this.avatarImgClassName)
+          );
+          avatarsData.push(avatarData);
+        }
+
         continue;
       }
 
@@ -169,12 +280,13 @@ export class CommentAvatar implements CommentAvatarArgs {
       if (this.isMatchAvatarName(avatarName)) {
         // 切り出したアバターネームが登録されていた場合は、
         // アバターデータを生成して配列に入れる
-        const avatarData = this.genDefaultAvatarData();
-
-        // querySelectorでクラス名検索しているので"."を忘れないこと
-        avatarData.imgEl = avatar.querySelector("." + this.avatarImgClassName);
-        avatarData.name = avatarName;
-        avatarData.url = this.avatarsList[avatarName];
+        const avatarData = this.avatarDataOverWrite(
+          this.genDefaultAvatarData(),
+          // querySelectorでクラス名検索しているので"."を忘れないこと
+          avatar.querySelector("." + this.avatarImgClassName),
+          avatarName,
+          this.avatarsList[avatarName]
+        )
 
         avatarsData.push(avatarData);
       }
@@ -189,7 +301,7 @@ export class CommentAvatar implements CommentAvatarArgs {
    * @return アバターネームが登録されていたかどうかのbool
    */
   isMatchAvatarName(avatarName: string): boolean {
-    return !!(this.avatarsList[avatarName]);
+    return !!this.avatarsList[avatarName];
   }
 
   /**
@@ -199,15 +311,11 @@ export class CommentAvatar implements CommentAvatarArgs {
    */
   genDefaultAvatarData(): AvatarData {
     const defaultAvatarName = "__default__";
-    let avatarUrl = "//static.fc2.com/image/sh_design/no_image/no_image_300x300.png"
-    if (this.avatarsList[defaultAvatarName]) {
-      avatarUrl = this.avatarsList[defaultAvatarName];
-    }
 
     return {
       imgEl: null,
       name: defaultAvatarName,
-      url: avatarUrl
+      url: this.avatarsList[defaultAvatarName],
     }
   }
 
