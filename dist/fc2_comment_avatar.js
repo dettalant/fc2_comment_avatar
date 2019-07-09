@@ -3,7 +3,7 @@
  * See {@link https://github.com/dettalant/fc2_comment_avatar| dettalant/fc2_comment_avatar}
  *
  * @author dettalant
- * @version v0.1.0
+ * @version v0.2.0
  * @license MIT License
  */
 var fc2_comment_avatar = (function (exports) {
@@ -27,19 +27,57 @@ var fc2_comment_avatar = (function (exports) {
           // lengthが0 = avatar要素が取得できなかった
           throw new CommentAvatarError("アバター要素の取得に失敗しました");
       }
+      var avatarSelectButton = document.getElementById(initArgs.avatarSelectButtonId);
+      if (avatarSelectButton === null) {
+          throw new CommentAvatarError("アバター選択ボタン要素の取得に失敗しました");
+      }
       // キャストは怖いがこればかりは仕方がない
       this.avatarContainers = avatars;
       this.avatarClassName = initArgs.avatarClassName;
       this.avatarImgClassName = initArgs.avatarImgClassName;
       this.avatarsList = initArgs.avatarsList;
+      this.avatarSelectButton = avatarSelectButton;
+      this.avatarSelectButtonId = initArgs.avatarSelectButtonId;
       if (initArgs.isUseDataSrc) {
           // useDataSrc項目がtrueである場合のみ上書き
           this.isUseDataSrc = initArgs.isUseDataSrc;
       }
+      // アバター選択ボタンにデフォルト画像を追加
+      this.avatarSelectButtonImg = this.avatarSelectButtonInit(this.avatarSelectButton);
       // アバターコードに合わせて画像書き換え
       // NOTE: promiseを用いたコードにしてもいいかも。
       var avatarsArray = this.scanAvatarCodes();
-      this.avatarsImageOverWrite(avatarsArray);
+      this.avatarsImgOverWrite(avatarsArray);
+  };
+  /**
+   * アバター選択ボタンを初期化する変数
+   * @param  el アバター選択ボタンとなる空要素
+   * @return 現在選択中のアバター画像を表示するimg要素
+   */
+  CommentAvatar.prototype.avatarSelectButtonInit = function avatarSelectButtonInit (el) {
+      var avatarImg = document.createElement("img");
+      avatarImg.className = "comment_avatar_img lazyload";
+      // デフォルトアバターを生成
+      var avatarData = this.genDefaultAvatarData();
+      // TODO: この部分でCookie情報を取得して、
+      // 以前設定していたアバターに戻す
+      // 画像情報を書き換える
+      avatarData.imgEl = avatarImg;
+      this.avatarImgOverWrite(avatarData);
+      var avatarImgWrapper = document.createElement("div");
+      avatarImgWrapper.className = "comment_form_avatar_img_wrapper";
+      avatarImgWrapper.appendChild(avatarImg);
+      // アバター選択ボタン内に画像を配置
+      el.appendChild(avatarImgWrapper);
+      var buttonText = el.dataset.buttonText;
+      if (buttonText !== undefined) {
+          // `data-button-text`が空欄でなければspan要素として追加する
+          var avatarButtonText = document.createElement("span");
+          avatarButtonText.className = "comment_form_avatar_button_text";
+          avatarButtonText.innerText = buttonText;
+          el.appendChild(avatarButtonText);
+      }
+      return avatarImg;
   };
   /**
    * avatar要素全てのdata-avatar-code部分を確認して、
@@ -110,26 +148,32 @@ var fc2_comment_avatar = (function (exports) {
       };
   };
   /**
+   * 単一のアバターデータを入力して、一つの画像URLを書き換える
+   * @param  avatarData 書き換えを行いたいアバターデータ
+   */
+  CommentAvatar.prototype.avatarImgOverWrite = function avatarImgOverWrite (avatarData) {
+      // imgElがnullであったなら次周回へ
+      if (avatarData.imgEl === null) {
+          return;
+      }
+      if (this.isUseDataSrc) {
+          // data-src要素を書き換え
+          // ここのキャストも致し方なし
+          avatarData.imgEl.dataset.src = avatarData.url;
+      }
+      else {
+          // src要素を書き換え
+          avatarData.imgEl.src = avatarData.url;
+      }
+  };
+  /**
    * アバターデータ配列を入力して、ことごとくの画像URLを書き換える
    * @param  avatarsArray 画像書き換えが必要なアバターデータ配列
    */
-  CommentAvatar.prototype.avatarsImageOverWrite = function avatarsImageOverWrite (avatarsArray) {
+  CommentAvatar.prototype.avatarsImgOverWrite = function avatarsImgOverWrite (avatarsArray) {
       var avatarsDataLen = avatarsArray.length;
       for (var i = 0; i < avatarsDataLen; i++) {
-          var avatarData = avatarsArray[i];
-          // imgElがnullであったなら次周回へ
-          if (avatarData.imgEl === null) {
-              continue;
-          }
-          if (this.isUseDataSrc) {
-              // data-src要素を書き換え
-              // ここのキャストも致し方なし
-              avatarData.imgEl.dataset.src = avatarData.url;
-          }
-          else {
-              // src要素を書き換え
-              avatarData.imgEl.src = avatarData.url;
-          }
+          this.avatarImgOverWrite(avatarsArray[i]);
       }
   };
 
