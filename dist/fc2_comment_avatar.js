@@ -9,6 +9,13 @@
 var fc2_comment_avatar = (function (exports) {
   'use strict';
 
+  // 定数
+  // タッチ対応端末では"touchend"イベントを、タッチ非対応端末では"click"イベントを設定する
+  var DEVICE_CLICK_EVENT_TYPE = (window.ontouchend === null) ? "touchend" : "click";
+  // defaultアバターを指し示す名前
+  var DEFAULT_AVATAR_KEY = "__default__";
+  // 管理者アバターを指し示す名前
+  var ADMIN_AVATAR_KEY = "__admin__";
   var CommentAvatarError = function CommentAvatarError(message) {
       this.message = message;
       this.name = "NavManagerError";
@@ -56,14 +63,16 @@ var fc2_comment_avatar = (function (exports) {
       var avatarsArray = this.scanAvatarCodes();
       this.avatarsImgOverWrite(avatarsArray);
   };
+
+  var prototypeAccessors = { defaultAvatarData: { configurable: true },userAvatarsData: { configurable: true } };
   /**
    * avatarsListを内部で扱いやすく整形する
    * @param  avatarsList 外部から入力されたavatarsList
    * @return         整形後のavatarsList
    */
   CommentAvatar.prototype.avatarsListFormat = function avatarsListFormat (avatarsList) {
-      var defaultName = "__default__";
-      var adminName = "__admin__";
+      var defaultName = DEFAULT_AVATAR_KEY;
+      var adminName = ADMIN_AVATAR_KEY;
       if (avatarsList[defaultName] === undefined) {
           // default画像が設定されていないなら追加する
           avatarsList[defaultName] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
@@ -84,7 +93,10 @@ var fc2_comment_avatar = (function (exports) {
    * @return 現在選択中のアバター画像を表示するimg要素
    */
   CommentAvatar.prototype.avatarSelectButtonInit = function avatarSelectButtonInit (el) {
-      var elArray = [];
+          var this$1 = this;
+
+      // 引数で取ったElement内へと追加する要素をこの配列に入れる
+      var elAppendQueueArray = [];
       // 配列内の全てのHTMLElementをel内にぶっこむ
       var elAppendChilds = function (el, elArray) {
           var elArrayLen = elArray.length;
@@ -92,10 +104,45 @@ var fc2_comment_avatar = (function (exports) {
               el.appendChild(elArray[i]);
           }
       };
+      // クリックイベントを追加する関数
+      var elAddClickEvent = function (el, callback) {
+          el.addEventListener(DEVICE_CLICK_EVENT_TYPE, function (e) { return callback(e); });
+      };
+      /**
+       * アバター選択ボタンをまとめてぶっこむ
+       * @param  el アバター選択ボタンをぶっこむHTML要素
+       */
+      var elAppendAvatarSelectButtons = function (el) {
+          var userAvatars = this$1.userAvatarsData;
+          var userAvatarsLen = userAvatars.length;
+          var loop = function ( i ) {
+              var avatar = userAvatars[i];
+              // ボタン要素の用意
+              var buttonEl = document.createElement("button");
+              buttonEl.type = "button";
+              buttonEl.className = "comment_form_avatar_select_button";
+              elAddClickEvent(buttonEl, function () {
+                  // TODO: ここにメールアドレス欄ジャック処理を入れる
+                  console.log("click: " + avatar.name);
+              });
+              // ボタン要素に入れる画像の用意
+              var imgEl = document.createElement("img");
+              imgEl.className = "comment_avatar_img lazyload";
+              avatar.imgEl = imgEl;
+              this$1.avatarImgOverWrite(avatar);
+              // ボタン要素に画像を追加
+              buttonEl.appendChild(avatar.imgEl);
+              // 親要素にボタン要素を追加
+              el.appendChild(buttonEl);
+          };
+
+              for (var i = 0; i < userAvatarsLen; i++) loop( i );
+      };
+      // アバター選択ボタンに表示するアバター画像
       var avatarImg = document.createElement("img");
       avatarImg.className = "comment_avatar_img lazyload";
       // デフォルトアバターを生成
-      var avatarData = this.genDefaultAvatarData();
+      var avatarData = this.defaultAvatarData;
       // TODO: この部分でlocalStorage情報を取得して、
       // ユーザーが以前設定していたアバターに戻す
       // 画像情報を書き換える
@@ -105,7 +152,7 @@ var fc2_comment_avatar = (function (exports) {
       avatarImgWrapper.className = "comment_form_avatar_img_wrapper";
       avatarImgWrapper.appendChild(avatarImg);
       // アバター選択ボタン内に画像を配置
-      elArray.push(avatarImgWrapper);
+      elAppendQueueArray.push(avatarImgWrapper);
       // ボタンテキストを配置
       var buttonText = el.dataset.buttonText;
       if (buttonText !== undefined) {
@@ -113,13 +160,19 @@ var fc2_comment_avatar = (function (exports) {
           var avatarButtonText = document.createElement("span");
           avatarButtonText.className = "comment_form_avatar_button_text";
           avatarButtonText.innerText = buttonText;
-          elArray.push(avatarButtonText);
+          elAppendQueueArray.push(avatarButtonText);
       }
       var avatarSelectContainer = document.createElement("div");
       avatarSelectContainer.className = "comment_form_avatar_select_container";
-      elArray.push(avatarSelectContainer);
+      // avatarSelectContainer内へとavatar画像を一気に放り込む
+      elAppendAvatarSelectButtons(avatarSelectContainer);
+      elAppendQueueArray.push(avatarSelectContainer);
       // 配列内の要素を順番にelへと入れる
-      elAppendChilds(el, elArray);
+      elAppendChilds(el, elAppendQueueArray);
+      // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
+      elAddClickEvent(el, function () {
+          avatarSelectContainer.classList.toggle("is_visible");
+      });
       return avatarImg;
   };
   /**
@@ -158,10 +211,10 @@ var fc2_comment_avatar = (function (exports) {
           if (this.isUseAdminAvatar && isAdminAvatar) {
               // 管理者アバターを使用する設定でいて、
               // 管理者コメントの場合は無条件で管理者アバターを使用する
-              var adminAvatarName = "__admin__";
+              var adminAvatarName = ADMIN_AVATAR_KEY;
               var avatarData = this.avatarDataOverWrite(
               // avatarData
-              this.genDefaultAvatarData(), 
+              this.defaultAvatarData, 
               // imgEl
               avatar.querySelector("." + this.avatarImgClassName), 
               // names
@@ -175,7 +228,7 @@ var fc2_comment_avatar = (function (exports) {
               code.indexOf("[[") === -1 && code.indexOf("]]") === -1) {
               if (this.isUseCustomDefaultImg) {
                   // custom default画像フラグが有効なら書き換え
-                  var avatarData$1 = this.avatarDataOverWrite(this.genDefaultAvatarData(), avatar.querySelector("." + this.avatarImgClassName));
+                  var avatarData$1 = this.avatarDataOverWrite(this.defaultAvatarData, avatar.querySelector("." + this.avatarImgClassName));
                   avatarsData.push(avatarData$1);
               }
               continue;
@@ -195,7 +248,7 @@ var fc2_comment_avatar = (function (exports) {
           if (this.isMatchAvatarName(avatarName)) {
               // 切り出したアバターネームが登録されていた場合は、
               // アバターデータを生成して配列に入れる
-              var avatarData$2 = this.avatarDataOverWrite(this.genDefaultAvatarData(), 
+              var avatarData$2 = this.avatarDataOverWrite(this.defaultAvatarData, 
               // querySelectorでクラス名検索しているので"."を忘れないこと
               avatar.querySelector("." + this.avatarImgClassName), avatarName, this.avatarsList[avatarName]);
               avatarsData.push(avatarData$2);
@@ -216,13 +269,35 @@ var fc2_comment_avatar = (function (exports) {
    * 手っ取り早いから関数にしてるけれど、一つのクラスにしてもよかったかも。
    * @return 生成した初期状態アバターコード
    */
-  CommentAvatar.prototype.genDefaultAvatarData = function genDefaultAvatarData () {
-      var defaultAvatarName = "__default__";
+  prototypeAccessors.defaultAvatarData.get = function () {
+      var defaultAvatarName = DEFAULT_AVATAR_KEY;
       return {
           imgEl: null,
           name: defaultAvatarName,
           url: this.avatarsList[defaultAvatarName],
       };
+  };
+  /**
+   * 表示できる全てのアバターを取得する。
+   * 管理者アバターだけは特別な値として取得しない。
+   * @return 管理者アバターを除くアバターデータ一覧
+   */
+  prototypeAccessors.userAvatarsData.get = function () {
+      var userAvatars = [];
+      var avatarNames = Object.keys(this.avatarsList);
+      var avatarsListLen = avatarNames.length;
+      // デフォルトアバターは配列0番であってほしいので初めに追加
+      userAvatars.push(this.defaultAvatarData);
+      for (var i = 0; i < avatarsListLen; i++) {
+          var avatarName = avatarNames[i];
+          if (avatarName === DEFAULT_AVATAR_KEY || avatarName === ADMIN_AVATAR_KEY) {
+              // デフォルトアバターと管理者アバターは除外
+              continue;
+          }
+          var avatar = this.avatarDataOverWrite(this.defaultAvatarData, null, avatarName, this.avatarsList[avatarName]);
+          userAvatars.push(avatar);
+      }
+      return userAvatars;
   };
   /**
    * 単一のアバターデータを入力して、一つの画像URLを書き換える
@@ -253,6 +328,8 @@ var fc2_comment_avatar = (function (exports) {
           this.avatarImgOverWrite(avatarsArray[i]);
       }
   };
+
+  Object.defineProperties( CommentAvatar.prototype, prototypeAccessors );
 
   exports.CommentAvatar = CommentAvatar;
 

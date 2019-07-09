@@ -1,3 +1,11 @@
+// 定数
+// タッチ対応端末では"touchend"イベントを、タッチ非対応端末では"click"イベントを設定する
+const DEVICE_CLICK_EVENT_TYPE = (window.ontouchend === null) ? "touchend" : "click";
+// defaultアバターを指し示す名前
+const DEFAULT_AVATAR_KEY = "__default__";
+// 管理者アバターを指し示す名前
+const ADMIN_AVATAR_KEY = "__admin__";
+
 class CommentAvatarError implements Error {
   public name = "NavManagerError";
 
@@ -112,8 +120,8 @@ export class CommentAvatar implements CommentAvatarArgs {
    * @return             整形後のavatarsList
    */
   avatarsListFormat(avatarsList: AvatarsList): AvatarsList {
-    const defaultName = "__default__";
-    const adminName = "__admin__";
+    const defaultName = DEFAULT_AVATAR_KEY;
+    const adminName = ADMIN_AVATAR_KEY;
 
     if (avatarsList[defaultName] === undefined) {
       // default画像が設定されていないなら追加する
@@ -137,7 +145,8 @@ export class CommentAvatar implements CommentAvatarArgs {
    * @return 現在選択中のアバター画像を表示するimg要素
    */
   avatarSelectButtonInit(el: HTMLElement): HTMLImageElement {
-    const elArray = [];
+    // 引数で取ったElement内へと追加する要素をこの配列に入れる
+    const elAppendQueueArray = [];
 
     // 配列内の全てのHTMLElementをel内にぶっこむ
     const elAppendChilds = (el: HTMLElement, elArray: HTMLElement[]) => {
@@ -145,13 +154,53 @@ export class CommentAvatar implements CommentAvatarArgs {
       for (let i = 0; i < elArrayLen; i++) {
         el.appendChild(elArray[i]);
       }
-    }
+    };
 
+    // クリックイベントを追加する関数
+    const elAddClickEvent = (el: HTMLElement, callback: Function) => {
+      el.addEventListener(DEVICE_CLICK_EVENT_TYPE, (e) => callback(e))
+    };
+
+    /**
+     * アバター選択ボタンをまとめてぶっこむ
+     * @param  el アバター選択ボタンをぶっこむHTML要素
+     */
+    const elAppendAvatarSelectButtons = (el: HTMLElement) => {
+      const userAvatars = this.userAvatarsData;
+      const userAvatarsLen = userAvatars.length;
+
+      for (let i = 0; i < userAvatarsLen; i++) {
+        const avatar = userAvatars[i];
+
+        // ボタン要素の用意
+        const buttonEl = document.createElement("button");
+        buttonEl.type = "button";
+        buttonEl.className = "comment_form_avatar_select_button";
+        elAddClickEvent(buttonEl, () => {
+          // TODO: ここにメールアドレス欄ジャック処理を入れる
+          console.log("click: " + avatar.name);
+        })
+
+        // ボタン要素に入れる画像の用意
+        const imgEl = document.createElement("img");
+        imgEl.className = "comment_avatar_img lazyload";
+        avatar.imgEl = imgEl;
+        this.avatarImgOverWrite(avatar);
+
+        // ボタン要素に画像を追加
+        buttonEl.appendChild(avatar.imgEl);
+
+        // 親要素にボタン要素を追加
+        el.appendChild(buttonEl);
+      }
+    };
+
+    // アバター選択ボタンに表示するアバター画像
     const avatarImg = document.createElement("img");
     avatarImg.className = "comment_avatar_img lazyload";
 
     // デフォルトアバターを生成
-    const avatarData = this.genDefaultAvatarData();
+    const avatarData = this.defaultAvatarData;
 
     // TODO: この部分でlocalStorage情報を取得して、
     // ユーザーが以前設定していたアバターに戻す
@@ -164,7 +213,7 @@ export class CommentAvatar implements CommentAvatarArgs {
     avatarImgWrapper.className = "comment_form_avatar_img_wrapper";
     avatarImgWrapper.appendChild(avatarImg);
     // アバター選択ボタン内に画像を配置
-    elArray.push(avatarImgWrapper);
+    elAppendQueueArray.push(avatarImgWrapper);
 
     // ボタンテキストを配置
     const buttonText = el.dataset.buttonText;
@@ -173,15 +222,23 @@ export class CommentAvatar implements CommentAvatarArgs {
       const avatarButtonText = document.createElement("span");
       avatarButtonText.className = "comment_form_avatar_button_text";
       avatarButtonText.innerText = buttonText;
-      elArray.push(avatarButtonText)
+      elAppendQueueArray.push(avatarButtonText)
     }
 
     const avatarSelectContainer = document.createElement("div");
     avatarSelectContainer.className = "comment_form_avatar_select_container";
-    elArray.push(avatarSelectContainer);
+    // avatarSelectContainer内へとavatar画像を一気に放り込む
+    elAppendAvatarSelectButtons(avatarSelectContainer);
+
+    elAppendQueueArray.push(avatarSelectContainer);
 
     // 配列内の要素を順番にelへと入れる
-    elAppendChilds(el, elArray);
+    elAppendChilds(el, elAppendQueueArray);
+
+    // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
+    elAddClickEvent(el, () => {
+      avatarSelectContainer.classList.toggle("is_visible");
+    });
 
     return avatarImg;
   }
@@ -232,10 +289,10 @@ export class CommentAvatar implements CommentAvatarArgs {
       if (this.isUseAdminAvatar && isAdminAvatar) {
         // 管理者アバターを使用する設定でいて、
         // 管理者コメントの場合は無条件で管理者アバターを使用する
-        const adminAvatarName = "__admin__";
+        const adminAvatarName = ADMIN_AVATAR_KEY;
         const avatarData = this.avatarDataOverWrite(
           // avatarData
-          this.genDefaultAvatarData(),
+          this.defaultAvatarData,
           // imgEl
           avatar.querySelector("." + this.avatarImgClassName),
           // names
@@ -254,7 +311,7 @@ export class CommentAvatar implements CommentAvatarArgs {
         if (this.isUseCustomDefaultImg) {
           // custom default画像フラグが有効なら書き換え
           const avatarData = this.avatarDataOverWrite(
-            this.genDefaultAvatarData(),
+            this.defaultAvatarData,
             avatar.querySelector("." + this.avatarImgClassName)
           );
           avatarsData.push(avatarData);
@@ -281,7 +338,7 @@ export class CommentAvatar implements CommentAvatarArgs {
         // 切り出したアバターネームが登録されていた場合は、
         // アバターデータを生成して配列に入れる
         const avatarData = this.avatarDataOverWrite(
-          this.genDefaultAvatarData(),
+          this.defaultAvatarData,
           // querySelectorでクラス名検索しているので"."を忘れないこと
           avatar.querySelector("." + this.avatarImgClassName),
           avatarName,
@@ -309,14 +366,49 @@ export class CommentAvatar implements CommentAvatarArgs {
    * 手っ取り早いから関数にしてるけれど、一つのクラスにしてもよかったかも。
    * @return 生成した初期状態アバターコード
    */
-  genDefaultAvatarData(): AvatarData {
-    const defaultAvatarName = "__default__";
+  get defaultAvatarData(): AvatarData {
+    const defaultAvatarName = DEFAULT_AVATAR_KEY;
 
     return {
       imgEl: null,
       name: defaultAvatarName,
       url: this.avatarsList[defaultAvatarName],
     }
+  }
+
+
+  /**
+   * 表示できる全てのアバターを取得する。
+   * 管理者アバターだけは特別な値として取得しない。
+   * @return 管理者アバターを除くアバターデータ一覧
+   */
+  get userAvatarsData(): AvatarData[] {
+    const userAvatars: AvatarData[] = [];
+    const avatarNames = Object.keys(this.avatarsList);
+    const avatarsListLen = avatarNames.length;
+
+    // デフォルトアバターは配列0番であってほしいので初めに追加
+    userAvatars.push(this.defaultAvatarData)
+
+    for (let i = 0; i < avatarsListLen; i++) {
+      const avatarName = avatarNames[i]
+
+      if (avatarName === DEFAULT_AVATAR_KEY || avatarName === ADMIN_AVATAR_KEY) {
+        // デフォルトアバターと管理者アバターは除外
+        continue;
+      }
+
+      const avatar = this.avatarDataOverWrite(
+        this.defaultAvatarData,
+        null,
+        avatarName,
+        this.avatarsList[avatarName]
+      );
+
+      userAvatars.push(avatar);
+    }
+
+    return userAvatars
   }
 
   /**
