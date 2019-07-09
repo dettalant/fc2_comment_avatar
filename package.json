@@ -1,6 +1,6 @@
 {
   "name": "fc2_comment_avatar",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "main": "fc2_comment_avatar.js",
   "license": "MIT",
   "private": true,

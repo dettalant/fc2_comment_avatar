@@ -7,6 +7,7 @@ const DEFAULT_AVATAR_KEY = "__default__";
 const ADMIN_AVATAR_KEY = "__admin__";
 // ローカルストレージ登録に使用するkey name
 const LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
+const STATE_VISIBLE = "is_visible";
 
 class CommentAvatarError implements Error {
   public name = "CommentAvatarError";
@@ -135,18 +136,15 @@ export class CommentAvatar implements CommentAvatarArgs {
    * @return             整形後のavatarsList
    */
   avatarsListFormat(avatarsList: AvatarsList): AvatarsList {
-    const defaultName = DEFAULT_AVATAR_KEY;
-    const adminName = ADMIN_AVATAR_KEY;
-
-    if (avatarsList[defaultName] === undefined) {
+    if (avatarsList[DEFAULT_AVATAR_KEY] === undefined) {
       // default画像が設定されていないなら追加する
-      avatarsList[defaultName] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
+      avatarsList[DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
     } else {
       // default画像が設定されていたら書き換え対象を増やすフラグをtrueに
       this.isUseCustomDefaultImg = true;
     }
 
-    if (avatarsList[adminName] === undefined) {
+    if (avatarsList[ADMIN_AVATAR_KEY] === undefined) {
       // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
       this.isUseAdminAvatar = false;
     }
@@ -287,8 +285,40 @@ export class CommentAvatar implements CommentAvatarArgs {
 
     // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
     elAddClickEvent(el, () => {
-      avatarSelectContainer.classList.toggle("is_visible");
+      avatarSelectContainer.classList.toggle(STATE_VISIBLE);
     });
+
+    // avatarSelectContainerが展開されている際に範囲外をクリックすると閉じる
+    document.addEventListener(DEVICE_CLICK_EVENT_TYPE, (e) => {
+      if (avatarSelectContainer.className.indexOf(STATE_VISIBLE) === -1) {
+        // アバター選択ウィンドウが展開されていなければ処理終了
+        return;
+      }
+
+      // Jqueryのclosest的な挙動の関数。引数にとったtagNameと一致する、一番近い親要素を返す。
+      // もしdocumentまで遡ってしまったらdocumentを返す。
+      const closestElement = (el: Element, name: string): Element => {
+        const elTagName = el.tagName.toUpperCase();
+        const tagName = name.toUpperCase();
+        if (elTagName === tagName) {
+          return el;
+        } else if (elTagName !== tagName && el.parentElement !== null) {
+          return closestElement(el.parentElement, tagName);
+        }
+        return el;
+      }
+
+      if (e.target instanceof Element) {
+        const parentButton = closestElement(e.target, "button");
+
+        const isOtherAreaClick = parentButton.className.indexOf("comment_form_avatar_select_button") === -1 &&
+        parentButton.className.indexOf("comment_form_avatar_button") === -1;
+
+        if (isOtherAreaClick) {
+          avatarSelectContainer.classList.remove(STATE_VISIBLE);
+        }
+      }
+    })
 
     return avatarImg;
   }

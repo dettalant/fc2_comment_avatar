@@ -18,9 +18,10 @@ var fc2_comment_avatar = (function (exports) {
   var ADMIN_AVATAR_KEY = "__admin__";
   // ローカルストレージ登録に使用するkey name
   var LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
+  var STATE_VISIBLE = "is_visible";
   var CommentAvatarError = function CommentAvatarError(message) {
       this.message = message;
-      this.name = "NavManagerError";
+      this.name = "CommentAvatarError";
   };
   CommentAvatarError.prototype.toString = function toString () {
       return this.name + ": " + this.message;
@@ -80,17 +81,15 @@ var fc2_comment_avatar = (function (exports) {
    * @return         整形後のavatarsList
    */
   CommentAvatar.prototype.avatarsListFormat = function avatarsListFormat (avatarsList) {
-      var defaultName = DEFAULT_AVATAR_KEY;
-      var adminName = ADMIN_AVATAR_KEY;
-      if (avatarsList[defaultName] === undefined) {
+      if (avatarsList[DEFAULT_AVATAR_KEY] === undefined) {
           // default画像が設定されていないなら追加する
-          avatarsList[defaultName] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
+          avatarsList[DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
       }
       else {
           // default画像が設定されていたら書き換え対象を増やすフラグをtrueに
           this.isUseCustomDefaultImg = true;
       }
-      if (avatarsList[adminName] === undefined) {
+      if (avatarsList[ADMIN_AVATAR_KEY] === undefined) {
           // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
           this.isUseAdminAvatar = false;
       }
@@ -203,7 +202,35 @@ var fc2_comment_avatar = (function (exports) {
       elAppendChilds(el, elAppendQueueArray);
       // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
       elAddClickEvent(el, function () {
-          avatarSelectContainer.classList.toggle("is_visible");
+          avatarSelectContainer.classList.toggle(STATE_VISIBLE);
+      });
+      // avatarSelectContainerが展開されている際に範囲外をクリックすると閉じる
+      document.addEventListener(DEVICE_CLICK_EVENT_TYPE, function (e) {
+          if (avatarSelectContainer.className.indexOf(STATE_VISIBLE) === -1) {
+              // アバター選択ウィンドウが展開されていなければ処理終了
+              return;
+          }
+          // Jqueryのclosest的な挙動の関数。引数にとったtagNameと一致する、一番近い親要素を返す。
+          // もしdocumentまで遡ってしまったらdocumentを返す。
+          var closestElement = function (el, name) {
+              var elTagName = el.tagName.toUpperCase();
+              var tagName = name.toUpperCase();
+              if (elTagName === tagName) {
+                  return el;
+              }
+              else if (elTagName !== tagName && el.parentElement !== null) {
+                  return closestElement(el.parentElement, tagName);
+              }
+              return el;
+          };
+          if (e.target instanceof Element) {
+              var parentButton = closestElement(e.target, "button");
+              var isOtherAreaClick = parentButton.className.indexOf("comment_form_avatar_select_button") === -1 &&
+                  parentButton.className.indexOf("comment_form_avatar_button") === -1;
+              if (isOtherAreaClick) {
+                  avatarSelectContainer.classList.remove(STATE_VISIBLE);
+              }
+          }
       });
       return avatarImg;
   };
