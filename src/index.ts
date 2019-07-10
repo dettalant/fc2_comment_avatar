@@ -1,163 +1,106 @@
-// 定数
-// タッチ対応端末では"touchend"イベントを、タッチ非対応端末では"click"イベントを設定する
-const DEVICE_CLICK_EVENT_TYPE = (window.ontouchend === null) ? "touchend" : "click";
-// defaultアバターを指し示す名前
-const DEFAULT_AVATAR_KEY = "__default__";
-// 管理者アバターを指し示す名前
-const ADMIN_AVATAR_KEY = "__admin__";
-// ローカルストレージ登録に使用するkey name
-const LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
-const STATE_VISIBLE = "is_visible";
+import {
+  CommentAvatarArgs,
+  CommentAvatarOptions,
+  CommentAvatarTargetsSrc,
+  CommentAvatarTargets,
+  AvatarList,
+  AvatarData,
+} from "./interfaces";
+import { CommentAvatarError } from "./error";
+import { caConst } from "./constants";
 
-class CommentAvatarError implements Error {
-  public name = "CommentAvatarError";
-
-  constructor(public message: string) {}
-
-  toString() {
-    return this.name + ": " + this.message;
-  }
-}
-
-/**
- * 初期化時に要求するオブジェクト。これで諸々の設定を変更する
- */
-interface CommentAvatarArgs {
-  // アバター画像を格納する親要素でいて、
-  // data-avatar-codeを記述した要素のクラス名
-  avatarClassName: string;
-  // アバター画像クラス名
-  avatarImgClassName: string;
-  // メールアドレス入力欄クラス名
-  emailInputId: string;
-  // url書き換え先としてdata-src属性を使用するか否か
-  // lazyloadなどでdata-srcを用いるならtrue、用いないならfalse
-  isUseDataSrc?: boolean;
-  // 管理者コメントに専用アバターを付与するか否か
-  isUseAdminAvatar?: boolean;
-  // アバター画像をまとめてobjectとして登録
-  // key: アバター指定コード
-  // value: アバター画像url
-  avatarsList: AvatarsList;
-  // アバター選択ボタンのid
-  avatarSelectButtonId: string;
-}
-
-/**
- * 画像指定アバターコードと、その画像URLの組み合わせ。
- * key側の中身を文字列をアバターコードとして使用して、
- * value側の中身を画像URLとして使用する。
- */
-interface AvatarsList {
-  [s: string]: string
-}
-
-/**
- * アバターのimg要素、アバター名、アバター画像URLをセットにしたobject
- * scanAvatarCodes()で配列に入れて生成し、avatarsImgOverWrite()で書き換える
- */
-interface AvatarData {
-  imgEl: HTMLImageElement | null;
-  name: string;
-  url: string;
-}
-
-export class CommentAvatar implements CommentAvatarArgs {
-  avatarContainers: HTMLCollectionOf<HTMLElement>;
-  avatarClassName: string;
-  avatarImgClassName: string;
-  avatarSelectButton: HTMLElement;
-  avatarSelectButtonId: string;
-  avatarSelectButtonImg: HTMLImageElement;
-  emailInputId: string = "mail";
-  emailInput: HTMLInputElement;
-  // 初期値ではdata-src属性を使用しない
-  isUseDataSrc: boolean = false;
-  // 独自のデフォルト画像を使用する場合はtrue
-  isUseCustomDefaultImg: boolean = false;
-  isUseAdminAvatar: boolean = true;
-  avatarsList: AvatarsList;
-  constructor(initArgs?: CommentAvatarArgs) {
-    if (initArgs === undefined) {
+export class CommentAvatar {
+  // comment avatar Args
+  caArgs: CommentAvatarArgs;
+  constructor(args?: CommentAvatarArgs) {
+    if (args === undefined) {
       throw new CommentAvatarError("初期化に必要な情報が入力されませんでした。CommentAvatarクラスの初期化引数には必要情報が格納されたobjectを入れてください");
+    } else if (args.avatarsList === undefined) {
+      throw new CommentAvatarError("初期化引数にavatarsList要素がありません！");
     }
 
-    const avatars = document.getElementsByClassName(initArgs.avatarClassName);
+    // 値が与えられているならその値を、与えられていないなら初期値を用いる
+    const options = this.defaultCommentAvatarOptions;
+    if (args.options !== undefined) {
+      Object.assign(options, args.options);
+    }
+
+    const targetsSrc = this.defaultCommentAvatarTargetSrc;
+    if (args.targetsSrc !== undefined) {
+      Object.assign(targetsSrc, args.targetsSrc);
+    }
+
+    this.caArgs = {
+      avatarsList: {},
+      options: options,
+      targetsSrc: targetsSrc,
+    };
+
+    const targets: CommentAvatarTargets = {
+      avatars: null,
+      avatarSelectButton: null,
+      avatarSelectButtonImg: null,
+      emailInput: null,
+    };
+
+    // HTMLElementなどの取得
+    const avatars = document.getElementsByClassName(this.caArgs.targetsSrc.avatarClassName);
     if (avatars.length === 0) {
-      // lengthが0 = avatar要素が取得できなかった
-      throw new CommentAvatarError("アバター要素の取得に失敗しました");
-    }
-
-    const avatarSelectButton = document.getElementById(initArgs.avatarSelectButtonId);
-    if (avatarSelectButton === null) {
-      throw new CommentAvatarError("アバター選択ボタン要素の取得に失敗しました");
-    }
-
-    const emailInput = document.getElementById(initArgs.emailInputId);
-    if (emailInput === null || !(emailInput instanceof HTMLInputElement)) {
-      throw new CommentAvatarError("メールアドレス入力欄の取得に失敗しました");
-    }
-
-    // キャストは怖いがこればかりは仕方がない
-    this.avatarContainers = avatars as HTMLCollectionOf<HTMLElement>;
-    this.avatarClassName = initArgs.avatarClassName;
-    this.avatarImgClassName = initArgs.avatarImgClassName;
-    this.avatarsList = this.avatarsListFormat(initArgs.avatarsList);
-    this.avatarSelectButton = avatarSelectButton;
-    this.avatarSelectButtonId = initArgs.avatarSelectButtonId;
-
-    this.emailInputId = initArgs.emailInputId;
-    this.emailInput = emailInput;
-
-    if (initArgs.isUseDataSrc) {
-      // useDataSrc項目がtrueである場合のみ上書き
-      this.isUseDataSrc = initArgs.isUseDataSrc;
-    }
-
-    if (initArgs.isUseAdminAvatar === false) {
-      // 管理者コメントを無効化する設定がなされている場合のみ上書き
-      this.isUseAdminAvatar = initArgs.isUseAdminAvatar;
-    }
-
-    // アバター選択ボタンにデフォルト画像を追加
-    this.avatarSelectButtonImg = this.avatarSelectButtonInit(this.avatarSelectButton)
-
-
-    // アバターコードに合わせて画像書き換え
-    // NOTE: promiseを用いたコードにしてもいいかも。
-    const avatarsArray = this.scanAvatarCodes();
-    this.avatarsImgOverWrite(avatarsArray);
-
-  }
-
-  /**
-   * avatarsListを内部で扱いやすく整形する
-   * @param  avatarsList 外部から入力されたavatarsList
-   * @return             整形後のavatarsList
-   */
-  avatarsListFormat(avatarsList: AvatarsList): AvatarsList {
-    if (avatarsList[DEFAULT_AVATAR_KEY] === undefined) {
-      // default画像が設定されていないなら追加する
-      avatarsList[DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
+      // lengthが0 = avatar要素が取得できなかったらコメントアバター書き換え機能を無効化
+      this.caArgs.options.isCommentAvatarOverwrite = false;
+      this.printDebugMessage("アバター要素の取得失敗。コメント欄アバター書き換え機能無効化", true);
     } else {
-      // default画像が設定されていたら書き換え対象を増やすフラグをtrueに
-      this.isUseCustomDefaultImg = true;
+      targets.avatars = avatars;
     }
 
-    if (avatarsList[ADMIN_AVATAR_KEY] === undefined) {
-      // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
-      this.isUseAdminAvatar = false;
+    const avatarSelectButton = document.getElementById(this.caArgs.targetsSrc.avatarSelectButtonId);
+    if (avatarSelectButton === null) {
+      this.caArgs.options.isAvatarSelect = false;
+      this.printDebugMessage("アバター選択ボタン要素の取得失敗。コメント入力欄アバター選択機能無効化");
+    } else {
+      targets.avatarSelectButton = avatarSelectButton
     }
 
-    return avatarsList;
+    if (this.caArgs.options.isAvatarSelect) {
+      // アバター選択機能が有効な際にのみ追加要素を読み込む
+      const emailInput = document.getElementById(this.caArgs.targetsSrc.emailInputId)
+      if (emailInput === null || !(emailInput instanceof HTMLInputElement)) {
+        this.caArgs.options.isAvatarSelect = false;
+        this.printDebugMessage("email入力欄要素の取得失敗。コメント入力欄アバター選択機能無効化");
+      } else {
+        targets.emailInput = emailInput;
+      }
+    }
+
+    this.caArgs.avatarsList = this.avatarListFormat(args.avatarsList);
+    this.caArgs.targets = targets;
+
+    if (this.caArgs.options.isCommentAvatarOverwrite) {
+      // アバターコードに合わせて画像書き換え
+      // NOTE: promiseを用いたコードにしてもいいかも。
+      this.printDebugMessage("コメントアバター書き換え処理実行", false)
+      const avatarsArray = this.scanAvatarCodes();
+      this.avatarImgsOverwrite(avatarsArray);
+    }
+
+    if (this.caArgs.options.isAvatarSelect && this.caArgs.targets.avatarSelectButton !== null) {
+      this.printDebugMessage("アバター選択ボタン設置処理実行", true);
+      this.avatarSelectButtonInit(this.caArgs.targets.avatarSelectButton);
+    }
   }
 
   /**
-   * アバター選択ボタンを初期化する変数
+   * アバター選択ボタンを初期化・生成する変数
    * @param  el アバター選択ボタンとなる空要素
    * @return 現在選択中のアバター画像を表示するimg要素
    */
-  avatarSelectButtonInit(el: HTMLElement): HTMLImageElement {
+  avatarSelectButtonInit(el: HTMLElement): HTMLImageElement | null {
+    // type guard処理
+    if (this.caArgs.targets === undefined ||
+      this.caArgs.targets.emailInput === null) {
+      return null;
+    }
+
     // 引数で取ったElement内へと追加する要素をこの配列に入れる
     const elAppendQueueArray = [];
 
@@ -169,10 +112,38 @@ export class CommentAvatar implements CommentAvatarArgs {
       }
     };
 
-    // クリックイベントを追加する関数
-    const elAddClickEvent = (el: HTMLElement, callback: Function) => {
-      el.addEventListener(DEVICE_CLICK_EVENT_TYPE, (e) => callback(e))
-    };
+    /**
+     * 初期設定アバターを特定のアバターで書き換える
+     * @param  avatarCode 書き換える対象とするavatarCode
+     * @return            書き換えが成功したならtrueを返す
+     */
+    const replaceInitialAvatar = (avatarCode: string): boolean => {
+      let isSuccessAvatarReplace = false;
+
+      if (this.caArgs.targets === undefined || this.caArgs.targets.emailInput === null) {
+        return isSuccessAvatarReplace;
+      }
+      // アバターコードからアバター名を取り出す
+      const avatarName = this.avatarCodeParse(avatarCode);
+
+      // 念の為アバターとして登録されているか確認してから処理を始める
+      if (this.isMatchAvatarName(avatarName)) {
+        // メールアドレス欄にアバターコードを入力
+        this.caArgs.targets.emailInput.value = avatarCode;
+        isSuccessAvatarReplace = true;
+        this.printDebugMessage(avatarName + "アバターを初期アバターとして使用", false)
+
+        // アバター選択ボタン画像の表示対象を書き換え
+        this.avatarDataOverWrite(
+          avatarData,
+          avatarImg,
+          avatarName,
+          this.getAvatarSrcUrl(avatarName),
+        );
+      }
+
+      return isSuccessAvatarReplace;
+    }
 
     /**
      * アバター選択ボタンをまとめてぶっこむ
@@ -191,29 +162,39 @@ export class CommentAvatar implements CommentAvatarArgs {
         buttonEl.className = "comment_form_avatar_select_button";
 
         // アバターがクリック選択された際の処理
-        elAddClickEvent(buttonEl, () => {
+        buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, () => {
+          // type guard処理
+          if (this.caArgs.targets === undefined ||
+            this.caArgs.targets.emailInput === null ||
+            this.caArgs.targets.avatarSelectButtonImg === null)
+          {
+            this.printDebugMessage("個別アバター選択ボタンクリック処理に必要要素が不足。処理を中止", true);
+            return;
+          }
+
           // メールアドレス欄ジャック処理
           let emailValue = "";
-          if (avatar.name !== DEFAULT_AVATAR_KEY) {
+          if (avatar.name !== caConst.DEFAULT_AVATAR_KEY) {
             // デフォルト画像以外の場合のみアバターコードを入れる
             emailValue = "[[" + avatar.name + "]]";
           }
 
+
           // email欄の書き換え
-          this.emailInput.value = emailValue;
+          this.caArgs.targets.emailInput.value = emailValue;
 
           // TODO: ここでローカルストレージ欄の書き換え
-          localStorage.setItem(LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
+          localStorage.setItem(caConst.LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
 
           // 直接画像src欄を書き換え
-          this.avatarSelectButtonImg.src = avatar.url;
+          this.caArgs.targets.avatarSelectButtonImg.src = avatar.url;
         })
 
         // ボタン要素に入れる画像の用意
         const imgEl = document.createElement("img");
         imgEl.className = "comment_avatar_img lazyload";
         avatar.imgEl = imgEl;
-        this.avatarImgOverWrite(avatar);
+        this.avatarImgOverwrite(avatar);
 
         // ボタン要素に画像を追加
         buttonEl.appendChild(avatar.imgEl);
@@ -230,32 +211,28 @@ export class CommentAvatar implements CommentAvatarArgs {
     // デフォルトアバターを生成
     const avatarData = this.defaultAvatarData;
 
+    // data-initial-avatar属性を取得する: 主にコメント編集画面用
+    const initialAvatarCode = el.dataset.initialAvatar;
+    // initialAvatarでの書き換えに成功したらlocalStorage側の値は使わない
+    let isSuccessAvatarReplace = false;
+    if (initialAvatarCode !== undefined && initialAvatarCode !== "") {
+      isSuccessAvatarReplace = replaceInitialAvatar(initialAvatarCode);
+    }
+
     // localStorageに記録していたアバターコードを取得して、
     // ユーザーが以前設定していたアバターに戻す
-    const storeAvatarCode = localStorage.getItem(LOCALSTORAGE_AVATAR_CODE_KEY);
-    if (storeAvatarCode !== null && storeAvatarCode !== "") {
-      // アバターコードからアバター名を取り出す
-      const avatarName = this.avatarCodeParse(storeAvatarCode);
-
-      // 念の為アバターとして登録されているか確認してから処理を始める
-      if (this.isMatchAvatarName(avatarName)) {
-        // メールアドレス欄にアバターコードを入力
-        this.emailInput.value = storeAvatarCode;
-
-        // アバター選択ボタン画像の表示対象を書き換え
-        this.avatarDataOverWrite(
-          avatarData,
-          avatarImg,
-          avatarName,
-          this.getAvatarSrcUrl(avatarName),
-        );
+    if (!isSuccessAvatarReplace) {
+      const storeAvatarCode = localStorage.getItem(caConst.LOCALSTORAGE_AVATAR_CODE_KEY);
+      if (storeAvatarCode !== null && storeAvatarCode !== "") {
+        replaceInitialAvatar(storeAvatarCode);
       }
-
     }
 
     // 画像情報を書き換える
     avatarData.imgEl = avatarImg;
-    this.avatarImgOverWrite(avatarData);
+    this.avatarImgOverwrite(avatarData);
+    // 画像要素をargsオブジェクトに登録しておく
+    this.caArgs.targets.avatarSelectButtonImg = avatarImg;
 
     const avatarImgWrapper = document.createElement("div");
     avatarImgWrapper.className = "comment_form_avatar_img_wrapper";
@@ -284,13 +261,13 @@ export class CommentAvatar implements CommentAvatarArgs {
     elAppendChilds(el, elAppendQueueArray);
 
     // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
-    elAddClickEvent(el, () => {
-      avatarSelectContainer.classList.toggle(STATE_VISIBLE);
-    });
+    el.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, () => {
+      avatarSelectContainer.classList.toggle(caConst.STATE_VISIBLE);
+    })
 
     // avatarSelectContainerが展開されている際に範囲外をクリックすると閉じる
-    document.addEventListener(DEVICE_CLICK_EVENT_TYPE, (e) => {
-      if (avatarSelectContainer.className.indexOf(STATE_VISIBLE) === -1) {
+    document.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, (e) => {
+      if (avatarSelectContainer.className.indexOf(caConst.STATE_VISIBLE) === -1) {
         // アバター選択ウィンドウが展開されていなければ処理終了
         return;
       }
@@ -315,12 +292,146 @@ export class CommentAvatar implements CommentAvatarArgs {
         parentButton.className.indexOf("comment_form_avatar_button") === -1;
 
         if (isOtherAreaClick) {
-          avatarSelectContainer.classList.remove(STATE_VISIBLE);
+          avatarSelectContainer.classList.remove(caConst.STATE_VISIBLE);
         }
       }
     })
 
     return avatarImg;
+  }
+
+  /**
+   * avatar要素全てのdata-avatar-code部分を確認して、
+   * 存在するavatar名と一致したavatarDataの配列を返す
+   * @return [description]
+   */
+  scanAvatarCodes(): AvatarData[] {
+    if (this.caArgs.targets === undefined || this.caArgs.targets.avatars === null) {
+      return [];
+    }
+
+    const avatarsLen = this.caArgs.targets.avatars.length;
+    const avatarImgClassName = this.caArgs.targetsSrc.avatarImgClassName;
+    const avatarsData = [];
+    for (let i = 0; i < avatarsLen; i++) {
+      const avatar = this.caArgs.targets.avatars[i];
+
+      if (!(avatar instanceof HTMLElement)) {
+        continue;
+      }
+
+      const code = avatar.dataset.avatarCode;
+      const isAdminAvatar = avatar.dataset.isAdminAvatar
+
+      if (this.caArgs.options.isUseAdminAvatar && isAdminAvatar) {
+        // 管理者アバターを使用する設定でいて、
+        // 管理者コメントの場合は無条件で管理者アバターを使用する
+        const adminAvatarName = caConst.ADMIN_AVATAR_KEY;
+        const avatarData = this.avatarDataOverWrite(
+          // avatarData
+          this.defaultAvatarData,
+          // imgEl
+          avatar.querySelector("." + avatarImgClassName),
+          // names
+          adminAvatarName,
+          // url
+          this.getAvatarSrcUrl(adminAvatarName)
+        );
+        avatarsData.push(avatarData);
+
+        continue;
+      }
+
+      if (code === undefined ||
+          code.indexOf("[[") === -1 && code.indexOf("]]") === -1)
+      {
+        if (this.caArgs.options.isUseCustomDefaultImg) {
+          // custom default画像フラグが有効なら書き換え
+          const avatarData = this.avatarDataOverWrite(
+            this.defaultAvatarData,
+            avatar.querySelector("." + avatarImgClassName)
+          );
+          avatarsData.push(avatarData);
+        }
+
+        continue;
+      }
+
+      // 取得したアバターコードからアバター名を切り出す
+      const avatarName = this.avatarCodeParse(code);
+
+      if (avatarName === "") {
+        // マッチしなかった場合は次周回へ
+        continue;
+      } else if (this.isMatchAvatarName(avatarName)) {
+        // アバターとして登録されているものだったなら、
+        // アバターデータを生成して配列に入れる
+        const avatarData = this.avatarDataOverWrite(
+          this.defaultAvatarData,
+          // querySelectorでクラス名検索しているので"."を忘れないこと
+          avatar.querySelector("." + avatarImgClassName),
+          avatarName,
+          this.getAvatarSrcUrl(avatarName),
+        )
+
+        avatarsData.push(avatarData);
+      }
+    }
+
+    return avatarsData;
+  }
+
+  /**
+   * avatarListを内部で扱いやすく整形する
+   * @param  avatarList 外部から入力されたavatarsList
+   * @return             整形後のavatarList
+   */
+  avatarListFormat(avatarList: AvatarList): AvatarList {
+    if (avatarList[caConst.DEFAULT_AVATAR_KEY] === undefined) {
+      // default画像が設定されていないなら追加する
+      avatarList[caConst.DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
+    } else {
+      // default画像が設定されていたら書き換え対象を増やすフラグをtrueに
+      this.caArgs.options.isUseCustomDefaultImg = true;
+    }
+
+    if (avatarList[caConst.ADMIN_AVATAR_KEY] === undefined) {
+      // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
+      this.caArgs.options.isUseAdminAvatar = false;
+    }
+
+    return avatarList;
+  }
+
+  /**
+   * アバターコードを読み取って内包されるアバター名を返す
+   * @param  avatarCode アバター指定コード
+   * @return            アバター名
+   */
+  avatarCodeParse(avatarCode: string): string {
+    // # 正規表現マッチ条件
+    // * "[["と"]]"に囲われた最初の対象にマッチ
+    // * 空白と"["と"]"を含めない文字列を
+    // * `[[ foo ]]`のように空白をつけた記述をされていても取り出す
+    // * 空白は半角/全角両方を対象とする
+    const regex = /\[\[[\s　]*?([^\[\]\s　]+?)[\s　]*?\]\]/;
+
+    const avatarNameArray = regex.exec(avatarCode);
+    if (avatarNameArray === null || avatarNameArray.length < 2) {
+      // マッチしなかった場合、もしくは何らかの問題で部分取得ができなかった場合は空欄を返す
+      return "";
+    }
+
+    return avatarNameArray[1]
+  }
+
+  /**
+   * 入力されたアバターネームが、avatarsListに登録されているかを判定する。登録されていたらtrue。
+   * @param  avatarName 判別に用いるemail欄テキスト
+   * @return アバターネームが登録されていたかどうかのbool
+   */
+  isMatchAvatarName(avatarName: string): boolean {
+    return !!this.caArgs.avatarsList[avatarName];
   }
 
   /**
@@ -354,103 +465,62 @@ export class CommentAvatar implements CommentAvatarArgs {
   }
 
   /**
-   * avatar要素全てのdata-avatar-code部分を確認して、
-   * 存在するavatar名と一致したavatarDataの配列を返す
-   * @return [description]
+   * 単一のアバターデータを入力して、一つの画像URLを書き換える
+   * @param  avatarData 書き換えを行いたいアバターデータ
    */
-  scanAvatarCodes(): AvatarData[] {
-    const avatarContainersLen = this.avatarContainers.length;
-    const avatarsData = [];
-    for (let i = 0; i < avatarContainersLen; i++) {
-      const avatar = this.avatarContainers[i];
-      const code = avatar.dataset.avatarCode;
-      const isAdminAvatar = avatar.dataset.isAdminAvatar
-
-      if (this.isUseAdminAvatar && isAdminAvatar) {
-        // 管理者アバターを使用する設定でいて、
-        // 管理者コメントの場合は無条件で管理者アバターを使用する
-        const adminAvatarName = ADMIN_AVATAR_KEY;
-        const avatarData = this.avatarDataOverWrite(
-          // avatarData
-          this.defaultAvatarData,
-          // imgEl
-          avatar.querySelector("." + this.avatarImgClassName),
-          // names
-          adminAvatarName,
-          // url
-          this.getAvatarSrcUrl(adminAvatarName)
-        );
-        avatarsData.push(avatarData);
-
-        continue;
-      }
-
-      if (code === undefined ||
-          code.indexOf("[[") === -1 && code.indexOf("]]") === -1)
-      {
-        if (this.isUseCustomDefaultImg) {
-          // custom default画像フラグが有効なら書き換え
-          const avatarData = this.avatarDataOverWrite(
-            this.defaultAvatarData,
-            avatar.querySelector("." + this.avatarImgClassName)
-          );
-          avatarsData.push(avatarData);
-        }
-
-        continue;
-      }
-
-      const avatarName = this.avatarCodeParse(code);
-      if (avatarName === "") {
-        // マッチしなかった場合は次周回へ
-        continue;
-      } else if (this.isMatchAvatarName(avatarName)) {
-        // 切り出したアバターネームが登録されていた場合は、
-        // アバターデータを生成して配列に入れる
-        const avatarData = this.avatarDataOverWrite(
-          this.defaultAvatarData,
-          // querySelectorでクラス名検索しているので"."を忘れないこと
-          avatar.querySelector("." + this.avatarImgClassName),
-          avatarName,
-          this.getAvatarSrcUrl(avatarName),
-        )
-
-        avatarsData.push(avatarData);
-      }
+  avatarImgOverwrite(avatarData: AvatarData) {
+    // 受け取ったデータのimgElがnullであったなら早期リターン
+    if (avatarData.imgEl === null) {
+      return;
     }
 
-    return avatarsData;
+    if (this.caArgs.options.isUseDataSrc) {
+      // data-src要素を書き換え
+      // ここのキャストも致し方なし
+      avatarData.imgEl.dataset.src = avatarData.url;
+    } else {
+      // src要素を書き換え
+      avatarData.imgEl.src = avatarData.url;
+    }
   }
 
   /**
-   * アバターコードを読み取って内包されるアバター名を返す
-   * @param  avatarCode アバター指定コード
-   * @return            アバター名
+   * アバターデータ配列を入力して、ことごとくの画像URLを書き換える
+   * @param  avatarsArray 画像書き換えが必要なアバターデータ配列
    */
-  avatarCodeParse(avatarCode: string): string {
-    // # 正規表現マッチ条件
-    // * "[["と"]]"に囲われた最初の対象にマッチ
-    // * 空白と"["と"]"を含めない文字列を
-    // * `[[ foo ]]`のように空白をつけた記述をされていても取り出す
-    // * 空白は半角/全角両方を対象とする
-    const regex = /\[\[[\s　]*?([^\[\]\s　]+?)[\s　]*?\]\]/;
-
-    const avatarNameArray = regex.exec(avatarCode);
-    if (avatarNameArray === null || avatarNameArray.length < 2) {
-      // マッチしなかった場合、もしくは何らかの問題で部分取得ができなかった場合は空欄を返す
-      return "";
+  avatarImgsOverwrite(avatarsArray: AvatarData[]) {
+    const avatarsDataLen = avatarsArray.length;
+    for (let i = 0; i < avatarsDataLen; i++) {
+      this.avatarImgOverwrite(avatarsArray[i]);
     }
-
-    return avatarNameArray[1]
   }
 
   /**
-   * 入力されたアバターネームが、avatarsListに登録されているかを判定する。登録されていたらtrue。
-   * @param  avatarName 判別に用いるemail欄テキスト
-   * @return アバターネームが登録されていたかどうかのbool
+   * デバッグモード有効状態で、もろもろの事柄を出力する
+   * @param  text   コンソールに出力するテキスト
+   * @param  isWarn 警告としてコンソール出力するならtrue
    */
-  isMatchAvatarName(avatarName: string): boolean {
-    return !!this.avatarsList[avatarName];
+  printDebugMessage(text: string, isWarn?: boolean) {
+    if (!this.caArgs.options.isDebug) {
+      // デバッグモードでないなら即終了
+      return;
+    }
+
+    if (isWarn) {
+      console.warn(text);
+    } else {
+      console.log(text);
+    }
+  }
+
+  /**
+   * avatarsListが内包するUrlを返す。もしアバター名でurlが引き出せなければ空欄を返す
+   * @param  avatarName urlを取り出したいアバター名
+   * @return            アバター名と紐付けられた画像url
+   */
+  getAvatarSrcUrl(avatarName: string): string {
+    const url = this.caArgs.avatarsList[avatarName];
+    return (url === undefined) ? "" : url;
   }
 
   /**
@@ -459,7 +529,7 @@ export class CommentAvatar implements CommentAvatarArgs {
    * @return 生成した初期状態アバターコード
    */
   get defaultAvatarData(): AvatarData {
-    const defaultAvatarName = DEFAULT_AVATAR_KEY;
+    const defaultAvatarName = caConst.DEFAULT_AVATAR_KEY;
 
     return {
       imgEl: null,
@@ -468,7 +538,6 @@ export class CommentAvatar implements CommentAvatarArgs {
     }
   }
 
-
   /**
    * 表示できる全てのアバターを取得する。
    * 管理者アバターだけは特別な値として取得しない。
@@ -476,7 +545,7 @@ export class CommentAvatar implements CommentAvatarArgs {
    */
   get userAvatarsData(): AvatarData[] {
     const userAvatars: AvatarData[] = [];
-    const avatarNames = Object.keys(this.avatarsList);
+    const avatarNames = Object.keys(this.caArgs.avatarsList);
     const avatarsListLen = avatarNames.length;
 
     // デフォルトアバターは配列0番であってほしいので初めに追加
@@ -485,7 +554,7 @@ export class CommentAvatar implements CommentAvatarArgs {
     for (let i = 0; i < avatarsListLen; i++) {
       const avatarName = avatarNames[i]
 
-      if (avatarName === DEFAULT_AVATAR_KEY || avatarName === ADMIN_AVATAR_KEY) {
+      if (avatarName === caConst.DEFAULT_AVATAR_KEY || avatarName === caConst.ADMIN_AVATAR_KEY) {
         // デフォルトアバターと管理者アバターは除外
         continue;
       }
@@ -503,43 +572,37 @@ export class CommentAvatar implements CommentAvatarArgs {
   }
 
   /**
-   * avatarsListが内包するUrlを返す。もしアバター名でurlが引き出せなければ空欄を返す
-   * @param  avatarName urlを取り出したいアバター名
-   * @return            アバター名と紐付けられた画像url
+   * CommentAvatarTargetsSrcの初期値を返す
+   * @return commentAvatarTargetsSrc初期値
    */
-  getAvatarSrcUrl(avatarName: string): string {
-    const url = this.avatarsList[avatarName];
-    return (url === undefined) ? "" : url;
-  }
-
-  /**
-   * 単一のアバターデータを入力して、一つの画像URLを書き換える
-   * @param  avatarData 書き換えを行いたいアバターデータ
-   */
-  avatarImgOverWrite(avatarData: AvatarData) {
-    // imgElがnullであったなら次周回へ
-    if (avatarData.imgEl === null) {
-      return;
-    }
-
-    if (this.isUseDataSrc) {
-      // data-src要素を書き換え
-      // ここのキャストも致し方なし
-      avatarData.imgEl.dataset.src = avatarData.url;
-    } else {
-      // src要素を書き換え
-      avatarData.imgEl.src = avatarData.url;
+  get defaultCommentAvatarTargetSrc(): CommentAvatarTargetsSrc {
+    return {
+      avatarClassName: "comment_avatar",
+      // アバター画像クラス名
+      avatarImgClassName: "comment_avatar_img",
+      // アバター選択ボタンid
+      avatarSelectButtonId: "commentAvatarSelectButton",
+      // メールアドレス入力欄id
+      emailInputId: "mail",
     }
   }
 
   /**
-   * アバターデータ配列を入力して、ことごとくの画像URLを書き換える
-   * @param  avatarsArray 画像書き換えが必要なアバターデータ配列
+   * [defaultCommentAvatarOptions description]
+   * @return [description]
    */
-  avatarsImgOverWrite(avatarsArray: AvatarData[]) {
-    const avatarsDataLen = avatarsArray.length;
-    for (let i = 0; i < avatarsDataLen; i++) {
-      this.avatarImgOverWrite(avatarsArray[i]);
+  get defaultCommentAvatarOptions(): CommentAvatarOptions {
+    return {
+      // url書き換え先としてdata-src属性を使用するか否か
+      isUseDataSrc: false,
+      // 管理者コメントに管理者アバター画像を表示するか否か
+      isUseAdminAvatar: true,
+      // 投稿コメントのアバターを書き換え機能の有効化設定
+      isCommentAvatarOverwrite: true,
+      // アバター選択ボタン機能の有効化設定
+      isAvatarSelect: true,
+      // デバッグモードの有効化設定
+      isDebug: false,
     }
   }
 }
