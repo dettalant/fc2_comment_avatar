@@ -13,20 +13,20 @@ export class CommentAvatar {
   // comment avatar Args
   caArgs: CommentAvatarArgs;
   constructor(args?: CommentAvatarArgs) {
-    if (args === undefined) {
+    if (typeof args === "undefined") {
       throw new CommentAvatarError("初期化に必要な情報が入力されませんでした。CommentAvatarクラスの初期化引数には必要情報が格納されたobjectを入れてください");
-    } else if (args.avatarsList === undefined) {
+    } else if (typeof args.avatarsList === "undefined") {
       throw new CommentAvatarError("初期化引数にavatarsList要素がありません！");
     }
 
     // 値が与えられているならその値を、与えられていないなら初期値を用いる
     const options = this.defaultCommentAvatarOptions;
-    if (args.options !== undefined) {
+    if (typeof args.options !== "undefined") {
       Object.assign(options, args.options);
     }
 
     const targetsSrc = this.defaultCommentAvatarTargetSrc;
-    if (args.targetsSrc !== undefined) {
+    if (typeof args.targetsSrc !== "undefined") {
       Object.assign(targetsSrc, args.targetsSrc);
     }
 
@@ -96,7 +96,7 @@ export class CommentAvatar {
    */
   avatarSelectButtonInit(el: HTMLElement): HTMLImageElement | null {
     // type guard処理
-    if (this.caArgs.targets === undefined ||
+    if (typeof this.caArgs.targets === "undefined" ||
       this.caArgs.targets.emailInput === null) {
       return null;
     }
@@ -120,7 +120,7 @@ export class CommentAvatar {
     const replaceInitialAvatar = (avatarCode: string): boolean => {
       let isSuccessAvatarReplace = false;
 
-      if (this.caArgs.targets === undefined || this.caArgs.targets.emailInput === null) {
+      if (typeof this.caArgs.targets === "undefined" || this.caArgs.targets.emailInput === null) {
         return isSuccessAvatarReplace;
       }
       // アバターコードからアバター名を取り出す
@@ -164,7 +164,7 @@ export class CommentAvatar {
         // アバターがクリック選択された際の処理
         buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, () => {
           // type guard処理
-          if (this.caArgs.targets === undefined ||
+          if (typeof this.caArgs.targets === "undefined" ||
             this.caArgs.targets.emailInput === null ||
             this.caArgs.targets.avatarSelectButtonImg === null)
           {
@@ -215,7 +215,7 @@ export class CommentAvatar {
     const initialAvatarCode = el.dataset.initialAvatar;
     // initialAvatarでの書き換えに成功したらlocalStorage側の値は使わない
     let isSuccessAvatarReplace = false;
-    if (initialAvatarCode !== undefined && initialAvatarCode !== "") {
+    if (typeof initialAvatarCode !== "undefined" && initialAvatarCode !== "") {
       isSuccessAvatarReplace = replaceInitialAvatar(initialAvatarCode);
     }
 
@@ -242,7 +242,7 @@ export class CommentAvatar {
 
     // ボタンテキストを配置
     const buttonText = el.dataset.buttonText;
-    if (buttonText !== undefined) {
+    if (typeof buttonText !== "undefined") {
       // `data-button-text`が空欄でなければspan要素として追加する
       const avatarButtonText = document.createElement("span");
       avatarButtonText.className = "comment_form_avatar_button_text";
@@ -306,7 +306,7 @@ export class CommentAvatar {
    * @return [description]
    */
   scanAvatarCodes(): AvatarData[] {
-    if (this.caArgs.targets === undefined || this.caArgs.targets.avatars === null) {
+    if (typeof this.caArgs.targets === "undefined" || this.caArgs.targets.avatars === null) {
       return [];
     }
 
@@ -342,7 +342,7 @@ export class CommentAvatar {
         continue;
       }
 
-      if (code === undefined ||
+      if (typeof code === "undefined" ||
           code.indexOf("[[") === -1 && code.indexOf("]]") === -1)
       {
         if (this.caArgs.options.isUseCustomDefaultImg) {
@@ -387,7 +387,7 @@ export class CommentAvatar {
    * @return             整形後のavatarList
    */
   avatarListFormat(avatarList: AvatarList): AvatarList {
-    if (avatarList[caConst.DEFAULT_AVATAR_KEY] === undefined) {
+    if (typeof avatarList[caConst.DEFAULT_AVATAR_KEY] === "undefined") {
       // default画像が設定されていないなら追加する
       avatarList[caConst.DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
     } else {
@@ -395,7 +395,7 @@ export class CommentAvatar {
       this.caArgs.options.isUseCustomDefaultImg = true;
     }
 
-    if (avatarList[caConst.ADMIN_AVATAR_KEY] === undefined) {
+    if (typeof avatarList[caConst.ADMIN_AVATAR_KEY] === "undefined") {
       // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
       this.caArgs.options.isUseAdminAvatar = false;
     }
@@ -453,11 +453,11 @@ export class CommentAvatar {
       avatarData.imgEl = imgEl;
     }
 
-    if (name !== undefined) {
+    if (typeof name !== "undefined") {
       avatarData.name = name;
     }
 
-    if (url !== undefined) {
+    if (typeof url !== "undefined") {
       avatarData.url = url;
     }
 
@@ -520,7 +520,7 @@ export class CommentAvatar {
    */
   getAvatarSrcUrl(avatarName: string): string {
     const url = this.caArgs.avatarsList[avatarName];
-    return (url === undefined) ? "" : url;
+    return (typeof url === "undefined") ? "" : url;
   }
 
   /**
