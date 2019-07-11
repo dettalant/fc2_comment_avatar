@@ -1,5 +1,5 @@
 /*!
- * @file fc2_comment_avatar.js
+ *   fc2_comment_avatar.js
  * See {@link https://github.com/dettalant/fc2_comment_avatar| dettalant/fc2_comment_avatar}
  *
  * @author dettalant
