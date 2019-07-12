@@ -3,7 +3,7 @@
  * See {@link https://github.com/dettalant/fc2_comment_avatar| dettalant/fc2_comment_avatar}
  *
  * @author dettalant
- * @version v0.2.2
+ * @version v0.2.3
  * @license MIT License
  */
 var fc2_comment_avatar = (function (exports) {
@@ -199,7 +199,7 @@ var fc2_comment_avatar = (function (exports) {
       };
       // アバター選択ボタンに表示するアバター画像
       var avatarImg = document.createElement("img");
-      avatarImg.className = "comment_avatar_img lazyload";
+      avatarImg.className = this.caArgs.targetsSrc.avatarClassName;
       // デフォルトアバターを生成
       var avatarData = this.defaultAvatarData;
       // data-initial-avatar属性を取得する: 主にコメント編集画面用
@@ -348,8 +348,10 @@ var fc2_comment_avatar = (function (exports) {
           // default画像が設定されていないなら追加する
           avatarList[caConst.DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
       }
-      else {
-          // default画像が設定されていたら書き換え対象を増やすフラグをtrueに
+      else if (typeof this.caArgs.options.isUseCustomDefaultImg === "undefined") {
+          // default画像が設定されていて、
+          // なおかつoptionsから直接指定されていなければ、
+          // `__default__`として指定された値をデフォルト画像に用いるフラグをtrueに
           this.caArgs.options.isUseCustomDefaultImg = true;
       }
       if (typeof avatarList[caConst.ADMIN_AVATAR_KEY] === "undefined") {
@@ -415,10 +417,11 @@ var fc2_comment_avatar = (function (exports) {
       if (avatarData.imgEl === null) {
           return;
       }
-      if (this.caArgs.options.isUseDataSrc) {
+      if (this.caArgs.options.isUseLazysizes) {
           // data-src要素を書き換え
-          // ここのキャストも致し方なし
           avatarData.imgEl.dataset.src = avatarData.url;
+          // lazysizesに書き換えてもらうためにクラス名を付け替える
+          avatarData.imgEl.className = this.caArgs.targetsSrc.avatarImgClassName + " lazyload";
       }
       else {
           // src要素を書き換え
@@ -512,7 +515,7 @@ var fc2_comment_avatar = (function (exports) {
           // アバター選択ボタンid
           avatarSelectButtonId: "commentAvatarSelectButton",
           // メールアドレス入力欄id
-          emailInputId: "mail",
+          emailInputId: "commentFormMail",
       };
   };
   /**
@@ -522,7 +525,7 @@ var fc2_comment_avatar = (function (exports) {
   prototypeAccessors.defaultCommentAvatarOptions.get = function () {
       return {
           // url書き換え先としてdata-src属性を使用するか否か
-          isUseDataSrc: false,
+          isUseLazysizes: false,
           // 管理者コメントに管理者アバター画像を表示するか否か
           isUseAdminAvatar: true,
           // 投稿コメントのアバターを書き換え機能の有効化設定

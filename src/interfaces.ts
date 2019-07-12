@@ -16,9 +16,8 @@ export interface CommentAvatarArgs {
  * スクリプト全体の設定値まとめオブジェクト
  */
 export interface CommentAvatarOptions {
-  // url書き換え先としてdata-src属性を使用するか否か
-  // lazyloadなどでdata-srcを用いるならtrue、用いないならfalse
-  isUseDataSrc?: boolean;
+  // lazysizes.js対応処理を行うか否か
+  isUseLazysizes?: boolean;
   // 管理者コメントに専用アバターを付与するか否か
   isUseAdminAvatar?: boolean;
   // 独自のデフォルト画像を使用するか否か
@@ -35,7 +34,7 @@ export interface CommentAvatarOptions {
 }
 
 /**
- * 操作対象となる要素を取得するためのクラス名やらidやら
+ * 操作対象要素を取得するためのクラス名やid名まとめ
  */
 export interface CommentAvatarTargetsSrc {
   // アバター画像を格納する親要素でいて、

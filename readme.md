@@ -77,18 +77,36 @@ var fc2CommentAvatar = new fc2_comment_avatar.CommentAvatar(initArgs);
 ```
 ## 引数詳細
 
-入れないとエラーになるやつは初期値について`N/A`で示す
+**CommentAvatarArgs**
 
-**インスタンス生成時**
+インスタンス生成時に必要なのがこれ。
 
 |名前|意味合い|初期値|
 |---|---|---|
-|avatarClassName|アバター画像を格納する親要素でいて、`data-avatar-code`を記述した要素のクラス名|N/A|
-|avatarImgClassName|アバター画像要素クラス名|N/A|
-|avatarSelectButtonId|アバター選択ボタンid|N/A|
-|isUseDataSrc|url書き換え先として、src属性の代わりにdata-src属性を使用するか|`false`|
+|options|スクリプト全体の設定値まとめ|`CommentAvatarOptions`の項を参照|
+|targetSrc|操作対象要素を取得するためのクラス名やid名まとめ|`CommentAvatarOptions`の項を参照|
+|avatarsList|アバター画像をまとめてobjectとして登録したもの|省略不可|
+
+
+**CommentAvatarOptions**
+
+|名前|意味合い|初期値|
+|---|---|---|
+|isUseLazysizes|[lazysizes](https://github.com/aFarkas/lazysizes)に対応したlazyload処理を行うか否か|`false`|
 |isUseAdminAvatar|管理者が行ったコメントに管理者アバター画像を表示するか否か|`true`|
-|avatarsList|アバター画像をまとめてobjectとして登録|N/A|
+|isUseCustomDefaultImg|独自のデフォルト画像(`__default__`として指定した値)を使用するか否か|`__default__`が指定されていれば`true`|
+|isCommentAvatarOverwrite|投稿コメントアバター書き換え機能を有効にするか否か|`true`|
+|isAvatarSelect|アバター選択ボタン生成機能を有効にするか否か|`true`|
+|isDebug|デバッグモードとして各種警告をconsoleに出力するか否か|`false`|
+
+**CommentAvatarTargetsSrc**
+
+|名前|意味合い|初期値|
+|---|---|---|
+|avatarClassName|アバター画像を格納する親要素でいて、`data-avatar-code`を記述した要素のクラス名|`comment_avatar`|
+|avatarImgClassName|アバター画像要素クラス名|`comment_avatar_img`|
+|avatarSelectButtonId|アバター選択ボタンid|`commentAvatarSelectButton`|
+|emailInputId|メールアドレス入力欄id|`commentFormMail`|
 
 **avatarsListの特殊な値**
 
