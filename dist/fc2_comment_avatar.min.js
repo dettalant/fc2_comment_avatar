@@ -1,6 +1,6 @@
 /*!
  *   fc2_comment_avatar.js
- * See {@link https://github.com/dettalant/fc2_comment_avatar| dettalant/fc2_comment_avatar}
+ * See {@link https://github.com/dettalant/fc2_comment_avatar}
  *
  * @author dettalant
  * @version v0.2.4
