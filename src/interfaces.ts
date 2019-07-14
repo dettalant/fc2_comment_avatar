@@ -20,6 +20,8 @@ export interface CommentAvatarOptions {
   isUseLazysizes?: boolean;
   // 管理者コメントに専用アバターを付与するか否か
   isUseAdminAvatar?: boolean;
+  // 非公開コメントに専用アバターを付与するか否か
+  isUseSecretAvatar?: boolean;
   // 独自のデフォルト画像を使用するか否か
   isUseCustomDefaultImg?: boolean;
   // 投稿コメントのアバターを書き換える機能を有効にするか否か

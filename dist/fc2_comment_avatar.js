@@ -3,7 +3,7 @@
  * See {@link https://github.com/dettalant/fc2_comment_avatar| dettalant/fc2_comment_avatar}
  *
  * @author dettalant
- * @version v0.2.3
+ * @version v0.2.4
  * @license MIT License
  */
 var fc2_comment_avatar = (function (exports) {
@@ -26,6 +26,7 @@ var fc2_comment_avatar = (function (exports) {
       caConst.DEFAULT_AVATAR_KEY = "__default__";
       // 管理者アバターを指し示す名前
       caConst.ADMIN_AVATAR_KEY = "__admin__";
+      caConst.SECRET_AVATAR_KEY = "__secret__";
       // ローカルストレージ登録に使用するkey name
       caConst.LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
       // ページ上に表示するステート名
@@ -296,6 +297,10 @@ var fc2_comment_avatar = (function (exports) {
           }
           var code = avatar.dataset.avatarCode;
           var isAdminAvatar = avatar.dataset.isAdminAvatar;
+          // 非公開コメントかどうかを検知するためのコメント件名
+          var commentSubject = (typeof avatar.dataset.commentSubject !== "undefined") ? avatar.dataset.commentSubject : "";
+          // 非公開コメントの場合はコメント件名がこの文字列になる
+          var secretCommentSubject = "管理人のみ閲覧できます";
           if (this.caArgs.options.isUseAdminAvatar && isAdminAvatar) {
               // 管理者アバターを使用する設定でいて、
               // 管理者コメントの場合は無条件で管理者アバターを使用する
@@ -312,12 +317,21 @@ var fc2_comment_avatar = (function (exports) {
               avatarsData.push(avatarData);
               continue;
           }
+          else if (this.caArgs.options.isUseSecretAvatar && commentSubject.indexOf(secretCommentSubject) !== -1) {
+              // 非公開アバターを使用する設定でいて、
+              // コメント件名が"管理人のみ閲覧できます"の場合は非公開コメントと判定し、
+              // 非公開アバターに差し替える
+              var secretAvatarName = caConst.SECRET_AVATAR_KEY;
+              var avatarData$1 = this.avatarDataOverWrite(this.defaultAvatarData, avatar.querySelector("." + avatarImgClassName), secretAvatarName, this.getAvatarSrcUrl(secretAvatarName));
+              avatarsData.push(avatarData$1);
+              continue;
+          }
           if (typeof code === "undefined" ||
               code.indexOf("[[") === -1 && code.indexOf("]]") === -1) {
               if (this.caArgs.options.isUseCustomDefaultImg) {
                   // custom default画像フラグが有効なら書き換え
-                  var avatarData$1 = this.avatarDataOverWrite(this.defaultAvatarData, avatar.querySelector("." + avatarImgClassName));
-                  avatarsData.push(avatarData$1);
+                  var avatarData$2 = this.avatarDataOverWrite(this.defaultAvatarData, avatar.querySelector("." + avatarImgClassName));
+                  avatarsData.push(avatarData$2);
               }
               continue;
           }
@@ -330,10 +344,10 @@ var fc2_comment_avatar = (function (exports) {
           else if (this.isMatchAvatarName(avatarName)) {
               // アバターとして登録されているものだったなら、
               // アバターデータを生成して配列に入れる
-              var avatarData$2 = this.avatarDataOverWrite(this.defaultAvatarData, 
+              var avatarData$3 = this.avatarDataOverWrite(this.defaultAvatarData, 
               // querySelectorでクラス名検索しているので"."を忘れないこと
               avatar.querySelector("." + avatarImgClassName), avatarName, this.getAvatarSrcUrl(avatarName));
-              avatarsData.push(avatarData$2);
+              avatarsData.push(avatarData$3);
           }
       }
       return avatarsData;
@@ -357,6 +371,9 @@ var fc2_comment_avatar = (function (exports) {
       if (typeof avatarList[caConst.ADMIN_AVATAR_KEY] === "undefined") {
           // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
           this.caArgs.options.isUseAdminAvatar = false;
+      }
+      if (typeof avatarList[caConst.SECRET_AVATAR_KEY] === "undefined") {
+          this.caArgs.options.isUseSecretAvatar = false;
       }
       return avatarList;
   };
@@ -490,8 +507,10 @@ var fc2_comment_avatar = (function (exports) {
       userAvatars.push(this.defaultAvatarData);
       for (var i = 0; i < avatarsListLen; i++) {
           var avatarName = avatarNames[i];
-          if (avatarName === caConst.DEFAULT_AVATAR_KEY || avatarName === caConst.ADMIN_AVATAR_KEY) {
-              // デフォルトアバターと管理者アバターは除外
+          if (avatarName === caConst.DEFAULT_AVATAR_KEY ||
+              avatarName === caConst.ADMIN_AVATAR_KEY ||
+              avatarName === caConst.SECRET_AVATAR_KEY) {
+              // デフォルトアバターと管理者アバターと非公開コメントアバターは除外
               continue;
           }
           var avatar = {
@@ -528,6 +547,8 @@ var fc2_comment_avatar = (function (exports) {
           isUseLazysizes: false,
           // 管理者コメントに管理者アバター画像を表示するか否か
           isUseAdminAvatar: true,
+          // 非公開コメントに専用アバターを付与するか否か
+          isUseSecretAvatar: true,
           // 投稿コメントのアバターを書き換え機能の有効化設定
           isCommentAvatarOverwrite: true,
           // アバター選択ボタン機能の有効化設定

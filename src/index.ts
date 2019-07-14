@@ -321,7 +321,12 @@ export class CommentAvatar {
       }
 
       const code = avatar.dataset.avatarCode;
-      const isAdminAvatar = avatar.dataset.isAdminAvatar
+      const isAdminAvatar = avatar.dataset.isAdminAvatar;
+
+      // 非公開コメントかどうかを検知するためのコメント件名
+      const commentSubject = (typeof avatar.dataset.commentSubject !== "undefined") ? avatar.dataset.commentSubject : "";
+      // 非公開コメントの場合はコメント件名がこの文字列になる
+      const secretCommentSubject = "管理人のみ閲覧できます";
 
       if (this.caArgs.options.isUseAdminAvatar && isAdminAvatar) {
         // 管理者アバターを使用する設定でいて、
@@ -339,6 +344,21 @@ export class CommentAvatar {
         );
         avatarsData.push(avatarData);
 
+        continue;
+      } else if (this.caArgs.options.isUseSecretAvatar && commentSubject.indexOf(secretCommentSubject) !== -1) {
+        // 非公開アバターを使用する設定でいて、
+        // コメント件名が"管理人のみ閲覧できます"の場合は非公開コメントと判定し、
+        // 非公開アバターに差し替える
+        const secretAvatarName = caConst.SECRET_AVATAR_KEY;
+
+        const avatarData = this.avatarDataOverWrite(
+          this.defaultAvatarData,
+          avatar.querySelector("." + avatarImgClassName),
+          secretAvatarName,
+          this.getAvatarSrcUrl(secretAvatarName)
+        );
+
+        avatarsData.push(avatarData);
         continue;
       }
 
@@ -400,6 +420,10 @@ export class CommentAvatar {
     if (typeof avatarList[caConst.ADMIN_AVATAR_KEY] === "undefined") {
       // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
       this.caArgs.options.isUseAdminAvatar = false;
+    }
+
+    if (typeof avatarList[caConst.SECRET_AVATAR_KEY] === "undefined") {
+      this.caArgs.options.isUseSecretAvatar = false;
     }
 
     return avatarList;
@@ -557,8 +581,11 @@ export class CommentAvatar {
     for (let i = 0; i < avatarsListLen; i++) {
       const avatarName = avatarNames[i]
 
-      if (avatarName === caConst.DEFAULT_AVATAR_KEY || avatarName === caConst.ADMIN_AVATAR_KEY) {
-        // デフォルトアバターと管理者アバターは除外
+      if (avatarName === caConst.DEFAULT_AVATAR_KEY ||
+        avatarName === caConst.ADMIN_AVATAR_KEY ||
+        avatarName === caConst.SECRET_AVATAR_KEY
+      ) {
+        // デフォルトアバターと管理者アバターと非公開コメントアバターは除外
         continue;
       }
 
@@ -600,6 +627,8 @@ export class CommentAvatar {
       isUseLazysizes: false,
       // 管理者コメントに管理者アバター画像を表示するか否か
       isUseAdminAvatar: true,
+      // 非公開コメントに専用アバターを付与するか否か
+      isUseSecretAvatar: true,
       // 投稿コメントのアバターを書き換え機能の有効化設定
       isCommentAvatarOverwrite: true,
       // アバター選択ボタン機能の有効化設定
