@@ -362,38 +362,42 @@ export class CommentAvatar {
         continue;
       }
 
-      if (typeof code === "undefined" ||
-          code.indexOf("[[") === -1 && code.indexOf("]]") === -1)
-      {
-        if (this.caArgs.options.isUseCustomDefaultImg) {
-          // custom default画像フラグが有効なら書き換え
+      // アバターコードが存在しており、
+      // なおかつ管理者コメントでも非公開コメントでもなかった場合の処理
+      if (typeof code !== "undefined" &&
+        code.indexOf("[[") !== -1 && code.indexOf("]]") !== -1
+      ) {
+        // 取得したアバターコードからアバター名を切り出す
+        const avatarName = this.avatarCodeParse(code);
+
+        if (avatarName === "") {
+          // do nothing
+        } else if (this.isMatchAvatarName(avatarName)) {
+          // アバターとして登録されているものだったなら、
+          // アバターデータを生成して配列に入れる
           const avatarData = this.avatarDataOverWrite(
             this.defaultAvatarData,
-            avatar.querySelector("." + avatarImgClassName)
-          );
-          avatarsData.push(avatarData);
-        }
+            // querySelectorでクラス名検索しているので"."を忘れないこと
+            avatar.querySelector("." + avatarImgClassName),
+            avatarName,
+            this.getAvatarSrcUrl(avatarName),
+          )
 
-        continue;
+          avatarsData.push(avatarData);
+          continue;
+        }
       }
 
-      // 取得したアバターコードからアバター名を切り出す
-      const avatarName = this.avatarCodeParse(code);
-
-      if (avatarName === "") {
-        // マッチしなかった場合は次周回へ
-        continue;
-      } else if (this.isMatchAvatarName(avatarName)) {
-        // アバターとして登録されているものだったなら、
-        // アバターデータを生成して配列に入れる
+      // 他条件にマッチしなければデフォルトアバターを書き出す
+      //
+      // ここに行き着いたら問答無用で書き換え対象となるので、
+      // くれぐれも`continue`でループ終了させるのを忘れないこと
+      if (this.caArgs.options.isUseCustomDefaultImg) {
+        // custom default画像フラグが有効なら書き換え
         const avatarData = this.avatarDataOverWrite(
           this.defaultAvatarData,
-          // querySelectorでクラス名検索しているので"."を忘れないこと
-          avatar.querySelector("." + avatarImgClassName),
-          avatarName,
-          this.getAvatarSrcUrl(avatarName),
-        )
-
+          avatar.querySelector("." + avatarImgClassName)
+        );
         avatarsData.push(avatarData);
       }
     }

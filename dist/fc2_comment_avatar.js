@@ -3,7 +3,7 @@
  * See {@link https://github.com/dettalant/fc2_comment_avatar}
  *
  * @author dettalant
- * @version v0.2.4
+ * @version v0.2.5
  * @license MIT License
  */
 var fc2_comment_avatar = (function (exports) {
@@ -326,27 +326,30 @@ var fc2_comment_avatar = (function (exports) {
               avatarsData.push(avatarData$1);
               continue;
           }
-          if (typeof code === "undefined" ||
-              code.indexOf("[[") === -1 && code.indexOf("]]") === -1) {
-              if (this.caArgs.options.isUseCustomDefaultImg) {
-                  // custom default画像フラグが有効なら書き換え
-                  var avatarData$2 = this.avatarDataOverWrite(this.defaultAvatarData, avatar.querySelector("." + avatarImgClassName));
+          // アバターコードが存在しており、
+          // なおかつ管理者コメントでも非公開コメントでもなかった場合の処理
+          if (typeof code !== "undefined" &&
+              code.indexOf("[[") !== -1 && code.indexOf("]]") !== -1) {
+              // 取得したアバターコードからアバター名を切り出す
+              var avatarName = this.avatarCodeParse(code);
+              if (avatarName === "") ;
+              else if (this.isMatchAvatarName(avatarName)) {
+                  // アバターとして登録されているものだったなら、
+                  // アバターデータを生成して配列に入れる
+                  var avatarData$2 = this.avatarDataOverWrite(this.defaultAvatarData, 
+                  // querySelectorでクラス名検索しているので"."を忘れないこと
+                  avatar.querySelector("." + avatarImgClassName), avatarName, this.getAvatarSrcUrl(avatarName));
                   avatarsData.push(avatarData$2);
+                  continue;
               }
-              continue;
           }
-          // 取得したアバターコードからアバター名を切り出す
-          var avatarName = this.avatarCodeParse(code);
-          if (avatarName === "") {
-              // マッチしなかった場合は次周回へ
-              continue;
-          }
-          else if (this.isMatchAvatarName(avatarName)) {
-              // アバターとして登録されているものだったなら、
-              // アバターデータを生成して配列に入れる
-              var avatarData$3 = this.avatarDataOverWrite(this.defaultAvatarData, 
-              // querySelectorでクラス名検索しているので"."を忘れないこと
-              avatar.querySelector("." + avatarImgClassName), avatarName, this.getAvatarSrcUrl(avatarName));
+          // 他条件にマッチしなければデフォルトアバターを書き出す
+          //
+          // ここに行き着いたら問答無用で書き換え対象となるので、
+          // くれぐれも`continue`でループ終了させるのを忘れないこと
+          if (this.caArgs.options.isUseCustomDefaultImg) {
+              // custom default画像フラグが有効なら書き換え
+              var avatarData$3 = this.avatarDataOverWrite(this.defaultAvatarData, avatar.querySelector("." + avatarImgClassName));
               avatarsData.push(avatarData$3);
           }
       }
