@@ -11,4 +11,5 @@ export namespace caConst {
   export const LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
   // ページ上に表示するステート名
   export const STATE_VISIBLE = "is_visible";
+  export const isExistTouchEvent = window.ontouchstart === null;
 }

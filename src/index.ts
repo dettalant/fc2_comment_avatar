@@ -3,6 +3,7 @@ import {
   CommentAvatarOptions,
   CommentAvatarTargetsSrc,
   CommentAvatarTargets,
+  CommentAvatarStates,
   AvatarList,
   AvatarData,
 } from "./interfaces";
@@ -12,6 +13,7 @@ import { caConst } from "./constants";
 export class CommentAvatar {
   // comment avatar Args
   caArgs: CommentAvatarArgs;
+  states: CommentAvatarStates = this.defaultCommentAvatarStates;
   constructor(args?: CommentAvatarArgs) {
     if (typeof args === "undefined") {
       throw new CommentAvatarError("初期化に必要な情報が入力されませんでした。CommentAvatarクラスの初期化引数には必要情報が格納されたobjectを入れてください");
@@ -86,6 +88,13 @@ export class CommentAvatar {
     if (this.caArgs.options.isAvatarSelect && this.caArgs.targets.avatarSelectButton !== null) {
       this.printDebugMessage("アバター選択ボタン設置処理実行", true);
       this.avatarSelectButtonInit(this.caArgs.targets.avatarSelectButton);
+    }
+
+    // touch eventを追加可能な場合に動作
+    if (caConst.isExistTouchEvent) {
+      this.printDebugMessage("スワイプ判定処理をwindow eventに追加");
+      // swipe判定処理をwindow eventに追加
+      this.appendSwipeValidationEvent();
     }
   }
 
@@ -163,6 +172,11 @@ export class CommentAvatar {
 
         // アバターがクリック選択された際の処理
         buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, () => {
+          // swipe中であった場合は処理をキャンセル
+          if (this.states.isSwiping) {
+            return;
+          }
+
           // type guard処理
           if (typeof this.caArgs.targets === "undefined" ||
             this.caArgs.targets.emailInput === null ||
@@ -262,13 +276,20 @@ export class CommentAvatar {
 
     // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
     el.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, () => {
+      // swipe判定時には処理キャンセル
+      if (this.states.isSwiping) {
+        return;
+      }
+
       avatarSelectContainer.classList.toggle(caConst.STATE_VISIBLE);
     })
 
     // avatarSelectContainerが展開されている際に範囲外をクリックすると閉じる
     document.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, (e) => {
-      if (avatarSelectContainer.className.indexOf(caConst.STATE_VISIBLE) === -1) {
-        // アバター選択ウィンドウが展開されていなければ処理終了
+      if (avatarSelectContainer.className.indexOf(caConst.STATE_VISIBLE) === -1
+        || this.states.isSwiping) {
+        // アバター選択ウィンドウが展開されていなければ、
+        // またスワイプを行い始めた際も処理終了
         return;
       }
 
@@ -555,6 +576,28 @@ export class CommentAvatar {
   }
 
   /**
+   * swipe時にtouchendをキャンセルする処理のために、
+   * swipeを行っているかを判定するイベントを追加する
+   */
+  appendSwipeValidationEvent() {
+    // スマホ判定を一応行っておく
+    if (caConst.isExistTouchEvent) {
+      // touchend指定時の、スワイプ判定追加記述
+      // NOTE: 若干やっつけ気味
+      window.addEventListener("touchstart", () => {
+        this.states.isSwiping = false;
+      });
+
+      window.addEventListener("touchmove", () => {
+        if (!this.states.isSwiping) {
+          // 無意味な上書きは一応避ける
+          this.states.isSwiping = true;
+        }
+      })
+    }
+  }
+
+  /**
    * 初期状態のアバターコードを生成する。
    * 手っ取り早いから関数にしてるけれど、一つのクラスにしてもよかったかも。
    * @return 生成した初期状態アバターコード
@@ -639,6 +682,13 @@ export class CommentAvatar {
       isAvatarSelect: true,
       // デバッグモードの有効化設定
       isDebug: false,
+    }
+  }
+
+  get defaultCommentAvatarStates(): CommentAvatarStates {
+    return {
+      // swipe中であればtrue、touchstart時に初期化される
+      isSwiping: false,
     }
   }
 }

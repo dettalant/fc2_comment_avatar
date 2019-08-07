@@ -3,7 +3,7 @@
  * See {@link https://github.com/dettalant/fc2_comment_avatar}
  *
  * @author dettalant
- * @version v0.2.5
+ * @version v0.2.6
  * @license MIT License
  */
 var fc2_comment_avatar = (function (exports) {
@@ -31,9 +31,11 @@ var fc2_comment_avatar = (function (exports) {
       caConst.LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
       // ページ上に表示するステート名
       caConst.STATE_VISIBLE = "is_visible";
+      caConst.isExistTouchEvent = window.ontouchstart === null;
   })(caConst || (caConst = {}));
 
   var CommentAvatar = function CommentAvatar(args) {
+      this.states = this.defaultCommentAvatarStates;
       if (typeof args === "undefined") {
           throw new CommentAvatarError("初期化に必要な情報が入力されませんでした。CommentAvatarクラスの初期化引数には必要情報が格納されたobjectを入れてください");
       }
@@ -102,9 +104,15 @@ var fc2_comment_avatar = (function (exports) {
           this.printDebugMessage("アバター選択ボタン設置処理実行", true);
           this.avatarSelectButtonInit(this.caArgs.targets.avatarSelectButton);
       }
+      // touch eventを追加可能な場合に動作
+      if (caConst.isExistTouchEvent) {
+          this.printDebugMessage("スワイプ判定処理をwindow eventに追加");
+          // swipe判定処理をwindow eventに追加
+          this.appendSwipeValidationEvent();
+      }
   };
 
-  var prototypeAccessors = { defaultAvatarData: { configurable: true },userAvatarsData: { configurable: true },defaultCommentAvatarTargetSrc: { configurable: true },defaultCommentAvatarOptions: { configurable: true } };
+  var prototypeAccessors = { defaultAvatarData: { configurable: true },userAvatarsData: { configurable: true },defaultCommentAvatarTargetSrc: { configurable: true },defaultCommentAvatarOptions: { configurable: true },defaultCommentAvatarStates: { configurable: true } };
   /**
    * アバター選択ボタンを初期化・生成する変数
    * @param  el アバター選択ボタンとなる空要素
@@ -165,6 +173,10 @@ var fc2_comment_avatar = (function (exports) {
               buttonEl.className = "comment_form_avatar_select_button";
               // アバターがクリック選択された際の処理
               buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function () {
+                  // swipe中であった場合は処理をキャンセル
+                  if (this$1.states.isSwiping) {
+                      return;
+                  }
                   // type guard処理
                   if (typeof this$1.caArgs.targets === "undefined" ||
                       this$1.caArgs.targets.emailInput === null ||
@@ -246,12 +258,18 @@ var fc2_comment_avatar = (function (exports) {
       elAppendChilds(el, elAppendQueueArray);
       // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
       el.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function () {
+          // swipe判定時には処理キャンセル
+          if (this$1.states.isSwiping) {
+              return;
+          }
           avatarSelectContainer.classList.toggle(caConst.STATE_VISIBLE);
       });
       // avatarSelectContainerが展開されている際に範囲外をクリックすると閉じる
       document.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function (e) {
-          if (avatarSelectContainer.className.indexOf(caConst.STATE_VISIBLE) === -1) {
-              // アバター選択ウィンドウが展開されていなければ処理終了
+          if (avatarSelectContainer.className.indexOf(caConst.STATE_VISIBLE) === -1
+              || this$1.states.isSwiping) {
+              // アバター選択ウィンドウが展開されていなければ、
+              // またスワイプを行い始めた際も処理終了
               return;
           }
           // Jqueryのclosest的な挙動の関数。引数にとったtagNameと一致する、一番近い親要素を返す。
@@ -485,6 +503,28 @@ var fc2_comment_avatar = (function (exports) {
       return (typeof url === "undefined") ? "" : url;
   };
   /**
+   * swipe時にtouchendをキャンセルする処理のために、
+   * swipeを行っているかを判定するイベントを追加する
+   */
+  CommentAvatar.prototype.appendSwipeValidationEvent = function appendSwipeValidationEvent () {
+          var this$1 = this;
+
+      // スマホ判定を一応行っておく
+      if (caConst.isExistTouchEvent) {
+          // touchend指定時の、スワイプ判定追加記述
+          // NOTE: 若干やっつけ気味
+          window.addEventListener("touchstart", function () {
+              this$1.states.isSwiping = false;
+          });
+          window.addEventListener("touchmove", function () {
+              if (!this$1.states.isSwiping) {
+                  // 無意味な上書きは一応避ける
+                  this$1.states.isSwiping = true;
+              }
+          });
+      }
+  };
+  /**
    * 初期状態のアバターコードを生成する。
    * 手っ取り早いから関数にしてるけれど、一つのクラスにしてもよかったかも。
    * @return 生成した初期状態アバターコード
@@ -558,6 +598,12 @@ var fc2_comment_avatar = (function (exports) {
           isAvatarSelect: true,
           // デバッグモードの有効化設定
           isDebug: false,
+      };
+  };
+  prototypeAccessors.defaultCommentAvatarStates.get = function () {
+      return {
+          // swipe中であればtrue、touchstart時に初期化される
+          isSwiping: false,
       };
   };
 

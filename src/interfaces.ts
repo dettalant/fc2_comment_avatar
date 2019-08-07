@@ -50,6 +50,11 @@ export interface CommentAvatarTargetsSrc {
   avatarSelectButtonId: string;
 }
 
+export interface CommentAvatarStates {
+  // スワイプ操作が行われた場合にはtrueとなる
+  isSwiping: boolean;
+}
+
 /**
  * 操作対象となる要素をまとめるオブジェクト
  */
