@@ -156,7 +156,7 @@ export class CommentAvatar {
 
     /**
      * アバター選択ボタンをまとめてぶっこむ
-     * @param  el アバター選択ボタンをぶっこむHTML要素
+     * @param  el アバター選択ボタンをぶっこむHTML要素(avatarSelectContainer)
      */
     const elAppendAvatarSelectButtons = (el: HTMLElement) => {
       const userAvatars = this.userAvatarsData;
@@ -171,13 +171,13 @@ export class CommentAvatar {
         buttonEl.className = "comment_form_avatar_select_button";
 
         // アバターがクリック選択された際の処理
-        buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, () => {
+        buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, (e) => {
           // swipe中であった場合は処理をキャンセル
           if (this.states.isSwiping) {
             return;
           }
 
-          // type guard処理
+                    // type guard処理
           if (typeof this.caArgs.targets === "undefined" ||
             this.caArgs.targets.emailInput === null ||
             this.caArgs.targets.avatarSelectButtonImg === null)
@@ -185,6 +185,9 @@ export class CommentAvatar {
             this.printDebugMessage("個別アバター選択ボタンクリック処理に必要要素が不足。処理を中止", true);
             return;
           }
+
+          // バブリングを停止
+          e.preventDefault();
 
           // メールアドレス欄ジャック処理
           let emailValue = "";
@@ -202,6 +205,9 @@ export class CommentAvatar {
 
           // 直接画像src欄を書き換え
           this.caArgs.targets.avatarSelectButtonImg.src = avatar.url;
+
+          // アバター選択ウィンドウを閉じる
+          el.classList.remove(caConst.STATE_VISIBLE);
         })
 
         // ボタン要素に入れる画像の用意
@@ -268,8 +274,9 @@ export class CommentAvatar {
     avatarSelectContainer.className = "comment_form_avatar_select_container";
     // avatarSelectContainer内へとavatar画像を一気に放り込む
     elAppendAvatarSelectButtons(avatarSelectContainer);
-
-    elAppendQueueArray.push(avatarSelectContainer);
+    if (el.parentElement instanceof HTMLElement) {
+      el.parentElement.insertBefore(avatarSelectContainer, el.nextSibling);
+    }
 
     // 配列内の要素を順番にelへと入れる
     elAppendChilds(el, elAppendQueueArray);

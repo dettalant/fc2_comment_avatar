@@ -3,7 +3,7 @@
  * See {@link https://github.com/dettalant/fc2_comment_avatar}
  *
  * @author dettalant
- * @version v0.2.6
+ * @version v0.2.7
  * @license MIT License
  */
 var fc2_comment_avatar = (function (exports) {
@@ -160,7 +160,7 @@ var fc2_comment_avatar = (function (exports) {
       };
       /**
        * アバター選択ボタンをまとめてぶっこむ
-       * @param  el アバター選択ボタンをぶっこむHTML要素
+       * @param  el アバター選択ボタンをぶっこむHTML要素(avatarSelectContainer)
        */
       var elAppendAvatarSelectButtons = function (el) {
           var userAvatars = this$1.userAvatarsData;
@@ -172,7 +172,7 @@ var fc2_comment_avatar = (function (exports) {
               buttonEl.type = "button";
               buttonEl.className = "comment_form_avatar_select_button";
               // アバターがクリック選択された際の処理
-              buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function () {
+              buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function (e) {
                   // swipe中であった場合は処理をキャンセル
                   if (this$1.states.isSwiping) {
                       return;
@@ -184,6 +184,8 @@ var fc2_comment_avatar = (function (exports) {
                       this$1.printDebugMessage("個別アバター選択ボタンクリック処理に必要要素が不足。処理を中止", true);
                       return;
                   }
+                  // バブリングを停止
+                  e.preventDefault();
                   // メールアドレス欄ジャック処理
                   var emailValue = "";
                   if (avatar.name !== caConst.DEFAULT_AVATAR_KEY) {
@@ -196,6 +198,8 @@ var fc2_comment_avatar = (function (exports) {
                   localStorage.setItem(caConst.LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
                   // 直接画像src欄を書き換え
                   this$1.caArgs.targets.avatarSelectButtonImg.src = avatar.url;
+                  // アバター選択ウィンドウを閉じる
+                  el.classList.remove(caConst.STATE_VISIBLE);
               });
               // ボタン要素に入れる画像の用意
               var imgEl = document.createElement("img");
@@ -253,7 +257,9 @@ var fc2_comment_avatar = (function (exports) {
       avatarSelectContainer.className = "comment_form_avatar_select_container";
       // avatarSelectContainer内へとavatar画像を一気に放り込む
       elAppendAvatarSelectButtons(avatarSelectContainer);
-      elAppendQueueArray.push(avatarSelectContainer);
+      if (el.parentElement instanceof HTMLElement) {
+          el.parentElement.insertBefore(avatarSelectContainer, el.nextSibling);
+      }
       // 配列内の要素を順番にelへと入れる
       elAppendChilds(el, elAppendQueueArray);
       // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
