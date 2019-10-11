@@ -3,17 +3,15 @@ import {
   CommentAvatarOptions,
   CommentAvatarTargetsSrc,
   CommentAvatarTargets,
-  CommentAvatarStates,
   AvatarList,
   AvatarData,
 } from "./interfaces";
 import { CommentAvatarError } from "./error";
-import { caConst } from "./constants";
+import { DEFAULT_AVATAR_KEY, LOCALSTORAGE_AVATAR_CODE_KEY, ADMIN_AVATAR_KEY, STATE_VISIBLE, SECRET_AVATAR_KEY } from "./constants";
 
 export class CommentAvatar {
   // comment avatar Args
   caArgs: CommentAvatarArgs;
-  states: CommentAvatarStates = this.defaultCommentAvatarStates;
   constructor(args?: CommentAvatarArgs) {
     if (typeof args === "undefined") {
       throw new CommentAvatarError("初期化に必要な情報が入力されませんでした。CommentAvatarクラスの初期化引数には必要情報が格納されたobjectを入れてください");
@@ -88,13 +86,6 @@ export class CommentAvatar {
     if (this.caArgs.options.isAvatarSelect && this.caArgs.targets.avatarSelectButton !== null) {
       this.printDebugMessage("アバター選択ボタン設置処理実行", true);
       this.avatarSelectButtonInit(this.caArgs.targets.avatarSelectButton);
-    }
-
-    // touch eventを追加可能な場合に動作
-    if (caConst.isExistTouchEvent) {
-      this.printDebugMessage("スワイプ判定処理をwindow eventに追加");
-      // swipe判定処理をwindow eventに追加
-      this.appendSwipeValidationEvent();
     }
   }
 
@@ -171,13 +162,8 @@ export class CommentAvatar {
         buttonEl.className = "comment_form_avatar_select_button";
 
         // アバターがクリック選択された際の処理
-        buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, (e) => {
-          // swipe中であった場合は処理をキャンセル
-          if (this.states.isSwiping) {
-            return;
-          }
-
-                    // type guard処理
+        buttonEl.addEventListener("click", (e) => {
+          // type guard処理
           if (typeof this.caArgs.targets === "undefined" ||
             this.caArgs.targets.emailInput === null ||
             this.caArgs.targets.avatarSelectButtonImg === null)
@@ -191,7 +177,7 @@ export class CommentAvatar {
 
           // メールアドレス欄ジャック処理
           let emailValue = "";
-          if (avatar.name !== caConst.DEFAULT_AVATAR_KEY) {
+          if (avatar.name !== DEFAULT_AVATAR_KEY) {
             // デフォルト画像以外の場合のみアバターコードを入れる
             emailValue = "[[" + avatar.name + "]]";
           }
@@ -201,13 +187,13 @@ export class CommentAvatar {
           this.caArgs.targets.emailInput.value = emailValue;
 
           // TODO: ここでローカルストレージ欄の書き換え
-          localStorage.setItem(caConst.LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
+          localStorage.setItem(LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
 
           // 直接画像src欄を書き換え
           this.caArgs.targets.avatarSelectButtonImg.src = avatar.url;
 
           // アバター選択ウィンドウを閉じる
-          el.classList.remove(caConst.STATE_VISIBLE);
+          el.classList.remove(STATE_VISIBLE);
         })
 
         // ボタン要素に入れる画像の用意
@@ -242,7 +228,7 @@ export class CommentAvatar {
     // localStorageに記録していたアバターコードを取得して、
     // ユーザーが以前設定していたアバターに戻す
     if (!isSuccessAvatarReplace) {
-      const storeAvatarCode = localStorage.getItem(caConst.LOCALSTORAGE_AVATAR_CODE_KEY);
+      const storeAvatarCode = localStorage.getItem(LOCALSTORAGE_AVATAR_CODE_KEY);
       if (storeAvatarCode !== null && storeAvatarCode !== "") {
         replaceInitialAvatar(storeAvatarCode);
       }
@@ -282,21 +268,14 @@ export class CommentAvatar {
     elAppendChilds(el, elAppendQueueArray);
 
     // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
-    el.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, () => {
-      // swipe判定時には処理キャンセル
-      if (this.states.isSwiping) {
-        return;
-      }
-
-      avatarSelectContainer.classList.toggle(caConst.STATE_VISIBLE);
+    el.addEventListener("click", () => {
+      avatarSelectContainer.classList.toggle(STATE_VISIBLE);
     })
 
     // avatarSelectContainerが展開されている際に範囲外をクリックすると閉じる
-    document.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, (e) => {
-      if (avatarSelectContainer.className.indexOf(caConst.STATE_VISIBLE) === -1
-        || this.states.isSwiping) {
-        // アバター選択ウィンドウが展開されていなければ、
-        // またスワイプを行い始めた際も処理終了
+    document.addEventListener("click", (e) => {
+      if (avatarSelectContainer.className.indexOf(STATE_VISIBLE) === -1) {
+        // アバター選択ウィンドウが展開されていなければ処理終了
         return;
       }
 
@@ -320,7 +299,7 @@ export class CommentAvatar {
         parentButton.className.indexOf("comment_form_avatar_button") === -1;
 
         if (isOtherAreaClick) {
-          avatarSelectContainer.classList.remove(caConst.STATE_VISIBLE);
+          avatarSelectContainer.classList.remove(STATE_VISIBLE);
         }
       }
     })
@@ -359,7 +338,7 @@ export class CommentAvatar {
       if (this.caArgs.options.isUseAdminAvatar && isAdminAvatar) {
         // 管理者アバターを使用する設定でいて、
         // 管理者コメントの場合は無条件で管理者アバターを使用する
-        const adminAvatarName = caConst.ADMIN_AVATAR_KEY;
+        const adminAvatarName = ADMIN_AVATAR_KEY;
         const avatarData = this.avatarDataOverWrite(
           // avatarData
           this.defaultAvatarData,
@@ -377,7 +356,7 @@ export class CommentAvatar {
         // 非公開アバターを使用する設定でいて、
         // コメント件名が"管理人のみ閲覧できます"の場合は非公開コメントと判定し、
         // 非公開アバターに差し替える
-        const secretAvatarName = caConst.SECRET_AVATAR_KEY;
+        const secretAvatarName = SECRET_AVATAR_KEY;
 
         const avatarData = this.avatarDataOverWrite(
           this.defaultAvatarData,
@@ -439,9 +418,9 @@ export class CommentAvatar {
    * @return             整形後のavatarList
    */
   avatarListFormat(avatarList: AvatarList): AvatarList {
-    if (typeof avatarList[caConst.DEFAULT_AVATAR_KEY] === "undefined") {
+    if (typeof avatarList[DEFAULT_AVATAR_KEY] === "undefined") {
       // default画像が設定されていないなら追加する
-      avatarList[caConst.DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
+      avatarList[DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
     } else if (typeof this.caArgs.options.isUseCustomDefaultImg === "undefined") {
       // default画像が設定されていて、
       // なおかつoptionsから直接指定されていなければ、
@@ -449,12 +428,12 @@ export class CommentAvatar {
       this.caArgs.options.isUseCustomDefaultImg = true;
     }
 
-    if (typeof avatarList[caConst.ADMIN_AVATAR_KEY] === "undefined") {
+    if (typeof avatarList[ADMIN_AVATAR_KEY] === "undefined") {
       // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
       this.caArgs.options.isUseAdminAvatar = false;
     }
 
-    if (typeof avatarList[caConst.SECRET_AVATAR_KEY] === "undefined") {
+    if (typeof avatarList[SECRET_AVATAR_KEY] === "undefined") {
       this.caArgs.options.isUseSecretAvatar = false;
     }
 
@@ -583,34 +562,12 @@ export class CommentAvatar {
   }
 
   /**
-   * swipe時にtouchendをキャンセルする処理のために、
-   * swipeを行っているかを判定するイベントを追加する
-   */
-  appendSwipeValidationEvent() {
-    // スマホ判定を一応行っておく
-    if (caConst.isExistTouchEvent) {
-      // touchend指定時の、スワイプ判定追加記述
-      // NOTE: 若干やっつけ気味
-      window.addEventListener("touchstart", () => {
-        this.states.isSwiping = false;
-      });
-
-      window.addEventListener("touchmove", () => {
-        if (!this.states.isSwiping) {
-          // 無意味な上書きは一応避ける
-          this.states.isSwiping = true;
-        }
-      })
-    }
-  }
-
-  /**
    * 初期状態のアバターコードを生成する。
    * 手っ取り早いから関数にしてるけれど、一つのクラスにしてもよかったかも。
    * @return 生成した初期状態アバターコード
    */
   get defaultAvatarData(): AvatarData {
-    const defaultAvatarName = caConst.DEFAULT_AVATAR_KEY;
+    const defaultAvatarName = DEFAULT_AVATAR_KEY;
 
     return {
       imgEl: null,
@@ -635,9 +592,9 @@ export class CommentAvatar {
     for (let i = 0; i < avatarsListLen; i++) {
       const avatarName = avatarNames[i]
 
-      if (avatarName === caConst.DEFAULT_AVATAR_KEY ||
-        avatarName === caConst.ADMIN_AVATAR_KEY ||
-        avatarName === caConst.SECRET_AVATAR_KEY
+      if (avatarName === DEFAULT_AVATAR_KEY ||
+        avatarName === ADMIN_AVATAR_KEY ||
+        avatarName === SECRET_AVATAR_KEY
       ) {
         // デフォルトアバターと管理者アバターと非公開コメントアバターは除外
         continue;
@@ -672,8 +629,8 @@ export class CommentAvatar {
   }
 
   /**
-   * [defaultCommentAvatarOptions description]
-   * @return [description]
+   * CommentAvatarOptionsの初期値を返す
+   * @return CommentAvatarOptions初期値
    */
   get defaultCommentAvatarOptions(): CommentAvatarOptions {
     return {
@@ -689,13 +646,6 @@ export class CommentAvatar {
       isAvatarSelect: true,
       // デバッグモードの有効化設定
       isDebug: false,
-    }
-  }
-
-  get defaultCommentAvatarStates(): CommentAvatarStates {
-    return {
-      // swipe中であればtrue、touchstart時に初期化される
-      isSwiping: false,
     }
   }
 }

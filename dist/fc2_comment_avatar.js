@@ -3,7 +3,7 @@
  * See {@link https://github.com/dettalant/fc2_comment_avatar}
  *
  * @author dettalant
- * @version v0.2.7
+ * @version v0.2.8
  * @license MIT License
  */
 var fc2_comment_avatar = (function (exports) {
@@ -17,25 +17,17 @@ var fc2_comment_avatar = (function (exports) {
       return this.name + ": " + this.message;
   };
 
-  // comment avatar constants
-  var caConst;
-  (function (caConst) {
-      // PCでは"click"を、SPでは"touchend"をクリックイベント指定部分に用いる
-      caConst.DEVICE_CLICK_EVENT_TYPE = (window.ontouchend === null) ? "touchend" : "click";
-      // defaultアバターを指し示す名前
-      caConst.DEFAULT_AVATAR_KEY = "__default__";
-      // 管理者アバターを指し示す名前
-      caConst.ADMIN_AVATAR_KEY = "__admin__";
-      caConst.SECRET_AVATAR_KEY = "__secret__";
-      // ローカルストレージ登録に使用するkey name
-      caConst.LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
-      // ページ上に表示するステート名
-      caConst.STATE_VISIBLE = "is_visible";
-      caConst.isExistTouchEvent = window.ontouchstart === null;
-  })(caConst || (caConst = {}));
+  // defaultアバターを指し示す名前
+  var DEFAULT_AVATAR_KEY = "__default__";
+  // 管理者アバターを指し示す名前
+  var ADMIN_AVATAR_KEY = "__admin__";
+  var SECRET_AVATAR_KEY = "__secret__";
+  // ローカルストレージ登録に使用するkey name
+  var LOCALSTORAGE_AVATAR_CODE_KEY = "avatarCode";
+  // ページ上に表示するステート名
+  var STATE_VISIBLE = "is_visible";
 
   var CommentAvatar = function CommentAvatar(args) {
-      this.states = this.defaultCommentAvatarStates;
       if (typeof args === "undefined") {
           throw new CommentAvatarError("初期化に必要な情報が入力されませんでした。CommentAvatarクラスの初期化引数には必要情報が格納されたobjectを入れてください");
       }
@@ -104,15 +96,9 @@ var fc2_comment_avatar = (function (exports) {
           this.printDebugMessage("アバター選択ボタン設置処理実行", true);
           this.avatarSelectButtonInit(this.caArgs.targets.avatarSelectButton);
       }
-      // touch eventを追加可能な場合に動作
-      if (caConst.isExistTouchEvent) {
-          this.printDebugMessage("スワイプ判定処理をwindow eventに追加");
-          // swipe判定処理をwindow eventに追加
-          this.appendSwipeValidationEvent();
-      }
   };
 
-  var prototypeAccessors = { defaultAvatarData: { configurable: true },userAvatarsData: { configurable: true },defaultCommentAvatarTargetSrc: { configurable: true },defaultCommentAvatarOptions: { configurable: true },defaultCommentAvatarStates: { configurable: true } };
+  var prototypeAccessors = { defaultAvatarData: { configurable: true },userAvatarsData: { configurable: true },defaultCommentAvatarTargetSrc: { configurable: true },defaultCommentAvatarOptions: { configurable: true } };
   /**
    * アバター選択ボタンを初期化・生成する変数
    * @param  el アバター選択ボタンとなる空要素
@@ -172,11 +158,7 @@ var fc2_comment_avatar = (function (exports) {
               buttonEl.type = "button";
               buttonEl.className = "comment_form_avatar_select_button";
               // アバターがクリック選択された際の処理
-              buttonEl.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function (e) {
-                  // swipe中であった場合は処理をキャンセル
-                  if (this$1.states.isSwiping) {
-                      return;
-                  }
+              buttonEl.addEventListener("click", function (e) {
                   // type guard処理
                   if (typeof this$1.caArgs.targets === "undefined" ||
                       this$1.caArgs.targets.emailInput === null ||
@@ -188,18 +170,18 @@ var fc2_comment_avatar = (function (exports) {
                   e.preventDefault();
                   // メールアドレス欄ジャック処理
                   var emailValue = "";
-                  if (avatar.name !== caConst.DEFAULT_AVATAR_KEY) {
+                  if (avatar.name !== DEFAULT_AVATAR_KEY) {
                       // デフォルト画像以外の場合のみアバターコードを入れる
                       emailValue = "[[" + avatar.name + "]]";
                   }
                   // email欄の書き換え
                   this$1.caArgs.targets.emailInput.value = emailValue;
                   // TODO: ここでローカルストレージ欄の書き換え
-                  localStorage.setItem(caConst.LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
+                  localStorage.setItem(LOCALSTORAGE_AVATAR_CODE_KEY, emailValue);
                   // 直接画像src欄を書き換え
                   this$1.caArgs.targets.avatarSelectButtonImg.src = avatar.url;
                   // アバター選択ウィンドウを閉じる
-                  el.classList.remove(caConst.STATE_VISIBLE);
+                  el.classList.remove(STATE_VISIBLE);
               });
               // ボタン要素に入れる画像の用意
               var imgEl = document.createElement("img");
@@ -229,7 +211,7 @@ var fc2_comment_avatar = (function (exports) {
       // localStorageに記録していたアバターコードを取得して、
       // ユーザーが以前設定していたアバターに戻す
       if (!isSuccessAvatarReplace) {
-          var storeAvatarCode = localStorage.getItem(caConst.LOCALSTORAGE_AVATAR_CODE_KEY);
+          var storeAvatarCode = localStorage.getItem(LOCALSTORAGE_AVATAR_CODE_KEY);
           if (storeAvatarCode !== null && storeAvatarCode !== "") {
               replaceInitialAvatar(storeAvatarCode);
           }
@@ -263,19 +245,13 @@ var fc2_comment_avatar = (function (exports) {
       // 配列内の要素を順番にelへと入れる
       elAppendChilds(el, elAppendQueueArray);
       // 親要素をクリックしたらavatarSelectContainer表示の切り替えを行う
-      el.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function () {
-          // swipe判定時には処理キャンセル
-          if (this$1.states.isSwiping) {
-              return;
-          }
-          avatarSelectContainer.classList.toggle(caConst.STATE_VISIBLE);
+      el.addEventListener("click", function () {
+          avatarSelectContainer.classList.toggle(STATE_VISIBLE);
       });
       // avatarSelectContainerが展開されている際に範囲外をクリックすると閉じる
-      document.addEventListener(caConst.DEVICE_CLICK_EVENT_TYPE, function (e) {
-          if (avatarSelectContainer.className.indexOf(caConst.STATE_VISIBLE) === -1
-              || this$1.states.isSwiping) {
-              // アバター選択ウィンドウが展開されていなければ、
-              // またスワイプを行い始めた際も処理終了
+      document.addEventListener("click", function (e) {
+          if (avatarSelectContainer.className.indexOf(STATE_VISIBLE) === -1) {
+              // アバター選択ウィンドウが展開されていなければ処理終了
               return;
           }
           // Jqueryのclosest的な挙動の関数。引数にとったtagNameと一致する、一番近い親要素を返す。
@@ -296,7 +272,7 @@ var fc2_comment_avatar = (function (exports) {
               var isOtherAreaClick = parentButton.className.indexOf("comment_form_avatar_select_button") === -1 &&
                   parentButton.className.indexOf("comment_form_avatar_button") === -1;
               if (isOtherAreaClick) {
-                  avatarSelectContainer.classList.remove(caConst.STATE_VISIBLE);
+                  avatarSelectContainer.classList.remove(STATE_VISIBLE);
               }
           }
       });
@@ -328,7 +304,7 @@ var fc2_comment_avatar = (function (exports) {
           if (this.caArgs.options.isUseAdminAvatar && isAdminAvatar) {
               // 管理者アバターを使用する設定でいて、
               // 管理者コメントの場合は無条件で管理者アバターを使用する
-              var adminAvatarName = caConst.ADMIN_AVATAR_KEY;
+              var adminAvatarName = ADMIN_AVATAR_KEY;
               var avatarData = this.avatarDataOverWrite(
               // avatarData
               this.defaultAvatarData, 
@@ -345,7 +321,7 @@ var fc2_comment_avatar = (function (exports) {
               // 非公開アバターを使用する設定でいて、
               // コメント件名が"管理人のみ閲覧できます"の場合は非公開コメントと判定し、
               // 非公開アバターに差し替える
-              var secretAvatarName = caConst.SECRET_AVATAR_KEY;
+              var secretAvatarName = SECRET_AVATAR_KEY;
               var avatarData$1 = this.avatarDataOverWrite(this.defaultAvatarData, avatar.querySelector("." + avatarImgClassName), secretAvatarName, this.getAvatarSrcUrl(secretAvatarName));
               avatarsData.push(avatarData$1);
               continue;
@@ -385,9 +361,9 @@ var fc2_comment_avatar = (function (exports) {
    * @return         整形後のavatarList
    */
   CommentAvatar.prototype.avatarListFormat = function avatarListFormat (avatarList) {
-      if (typeof avatarList[caConst.DEFAULT_AVATAR_KEY] === "undefined") {
+      if (typeof avatarList[DEFAULT_AVATAR_KEY] === "undefined") {
           // default画像が設定されていないなら追加する
-          avatarList[caConst.DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
+          avatarList[DEFAULT_AVATAR_KEY] = "https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png";
       }
       else if (typeof this.caArgs.options.isUseCustomDefaultImg === "undefined") {
           // default画像が設定されていて、
@@ -395,11 +371,11 @@ var fc2_comment_avatar = (function (exports) {
           // `__default__`として指定された値をデフォルト画像に用いるフラグをtrueに
           this.caArgs.options.isUseCustomDefaultImg = true;
       }
-      if (typeof avatarList[caConst.ADMIN_AVATAR_KEY] === "undefined") {
+      if (typeof avatarList[ADMIN_AVATAR_KEY] === "undefined") {
           // 管理者アバター画像が設定されていないなら管理者アバター表示機能を切る
           this.caArgs.options.isUseAdminAvatar = false;
       }
-      if (typeof avatarList[caConst.SECRET_AVATAR_KEY] === "undefined") {
+      if (typeof avatarList[SECRET_AVATAR_KEY] === "undefined") {
           this.caArgs.options.isUseSecretAvatar = false;
       }
       return avatarList;
@@ -509,34 +485,12 @@ var fc2_comment_avatar = (function (exports) {
       return (typeof url === "undefined") ? "" : url;
   };
   /**
-   * swipe時にtouchendをキャンセルする処理のために、
-   * swipeを行っているかを判定するイベントを追加する
-   */
-  CommentAvatar.prototype.appendSwipeValidationEvent = function appendSwipeValidationEvent () {
-          var this$1 = this;
-
-      // スマホ判定を一応行っておく
-      if (caConst.isExistTouchEvent) {
-          // touchend指定時の、スワイプ判定追加記述
-          // NOTE: 若干やっつけ気味
-          window.addEventListener("touchstart", function () {
-              this$1.states.isSwiping = false;
-          });
-          window.addEventListener("touchmove", function () {
-              if (!this$1.states.isSwiping) {
-                  // 無意味な上書きは一応避ける
-                  this$1.states.isSwiping = true;
-              }
-          });
-      }
-  };
-  /**
    * 初期状態のアバターコードを生成する。
    * 手っ取り早いから関数にしてるけれど、一つのクラスにしてもよかったかも。
    * @return 生成した初期状態アバターコード
    */
   prototypeAccessors.defaultAvatarData.get = function () {
-      var defaultAvatarName = caConst.DEFAULT_AVATAR_KEY;
+      var defaultAvatarName = DEFAULT_AVATAR_KEY;
       return {
           imgEl: null,
           name: defaultAvatarName,
@@ -556,9 +510,9 @@ var fc2_comment_avatar = (function (exports) {
       userAvatars.push(this.defaultAvatarData);
       for (var i = 0; i < avatarsListLen; i++) {
           var avatarName = avatarNames[i];
-          if (avatarName === caConst.DEFAULT_AVATAR_KEY ||
-              avatarName === caConst.ADMIN_AVATAR_KEY ||
-              avatarName === caConst.SECRET_AVATAR_KEY) {
+          if (avatarName === DEFAULT_AVATAR_KEY ||
+              avatarName === ADMIN_AVATAR_KEY ||
+              avatarName === SECRET_AVATAR_KEY) {
               // デフォルトアバターと管理者アバターと非公開コメントアバターは除外
               continue;
           }
@@ -587,8 +541,8 @@ var fc2_comment_avatar = (function (exports) {
       };
   };
   /**
-   * [defaultCommentAvatarOptions description]
-   * @return [description]
+   * CommentAvatarOptionsの初期値を返す
+   * @return CommentAvatarOptions初期値
    */
   prototypeAccessors.defaultCommentAvatarOptions.get = function () {
       return {
@@ -604,12 +558,6 @@ var fc2_comment_avatar = (function (exports) {
           isAvatarSelect: true,
           // デバッグモードの有効化設定
           isDebug: false,
-      };
-  };
-  prototypeAccessors.defaultCommentAvatarStates.get = function () {
-      return {
-          // swipe中であればtrue、touchstart時に初期化される
-          isSwiping: false,
       };
   };
 
