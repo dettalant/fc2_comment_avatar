@@ -19,7 +19,7 @@ FC2ブログのコメントシステムで「サイトごとの独自アバタ�
 
 ```
 
-アバター要素内部の初めの画像要素を選択するようにしてるので、javascript無効時のフォールバックはその下に表示するとよろし。
+アバター要素内部における、一番目の画像要素を書き換え対象とする仕様なのでjavascript無効時のフォールバックは二番目以降とすることを推奨。
 
 lazyloadするため[lazysizes](https://github.com/aFarkas/lazysizes)用記述を加えて、`noscript`フォールバックも付け足したものが以下。
 
@@ -32,7 +32,7 @@ lazyloadするため[lazysizes](https://github.com/aFarkas/lazysizes)用記述�
 </div>
 ```
 
-その後はよくある`<body>`終了直前で`<script>`として読み込み、インスタンス生成すればよろし。
+その後はよくある`<body>`終了直前で`<script>`として読み込み、インスタンス生成すればよろし
 
 ```html
 <script src="fc2_comment_avatar.min.js" async></script>
@@ -44,6 +44,8 @@ var avatarsList = {
   "__default__": "mofu_senkouin.png",
   // `__admin__`は管理者アバター画像
   "__admin__": "clerk_kitune.png",
+  // `__secret__`は非公開コメントアバター画像
+  "__secret__": "secret.png",
   "ao": "ao.png",
   "hitotume": "hitotume.png",
   "miyoshi": "miyoshi.png",
@@ -66,6 +68,10 @@ var initArgs = {
   // avatarsListで`__admin__`をkeyとした値がなければ使用されない
   // 初期値はtrue
   isUseAdminAvatar: false,
+  // 非公開コメントに専用アバター画像を表示するか否か
+  // avatarsListで`__secret__`をkeyとした値がなければ使用されない
+  // 初期値はtrue
+  isUseSecretAvatar: false,
   // アバター画像をまとめてobjectとして登録
   // key: アバター指定コード
   // value: アバター画像url
@@ -83,56 +89,47 @@ var fc2CommentAvatar = new fc2_comment_avatar.CommentAvatar(initArgs);
 
 |名前|意味合い|初期値|
 |---|---|---|
-|options|スクリプト全体の設定値まとめ|`CommentAvatarOptions`の項を参照|
-|targetSrc|操作対象要素を取得するためのクラス名やid名まとめ|`CommentAvatarOptions`の項を参照|
-|avatarsList|アバター画像をまとめてobjectとして登録したもの|省略不可|
+|`options`|スクリプト全体の設定値まとめ|`CommentAvatarOptions`の項を参照|
+|`targetSrc`|操作対象要素を取得するためのクラス名やid名まとめ|`CommentAvatarTargetsSrc`の項を参照|
+|`avatarsList`|アバター画像をまとめてobjectとして登録したもの|省略不可|
 
+&nbsp;
 
 **CommentAvatarOptions**
 
 |名前|意味合い|初期値|
 |---|---|---|
-|isUseLazysizes|[lazysizes](https://github.com/aFarkas/lazysizes)に対応したlazyload処理を行うか否か|`false`|
-|isUseAdminAvatar|管理者が行ったコメントに管理者アバター画像を表示するか否か|`true`|
-|isUseCustomDefaultImg|独自のデフォルト画像(`__default__`として指定した値)を使用するか否か|`__default__`が指定されていれば`true`|
-|isCommentAvatarOverwrite|投稿コメントアバター書き換え機能を有効にするか否か|`true`|
-|isAvatarSelect|アバター選択ボタン生成機能を有効にするか否か|`true`|
-|isDebug|デバッグモードとして各種警告をconsoleに出力するか否か|`false`|
+|`isUseLazysizes`|[lazysizes](https://github.com/aFarkas/lazysizes)に対応したlazyload処理を行うか否か|`false`|
+|`isUseAdminAvatar`|管理者が行ったコメントに管理者アバター画像を表示するか否か|`true`|
+|`isUseSecretAvatar`|非公開コメントに専用アバターを付与するか否か|`true`|
+|`isUseCustomDefaultImg`|独自のデフォルト画像(`__default__`として指定した値)を使用するか否か|`__default__`が指定されていれば`true`|
+|`isCommentAvatarOverwrite`|投稿コメントアバター書き換え機能を有効にするか否か|`true`|
+|`isAvatarSelect`|アバター選択ボタン生成機能を有効にするか否か|`true`|
+|`isDebug`|デバッグモードとして各種警告をconsoleに出力するか否か|`false`|
+
+※ lazysizesが導入されていない環境で`isUseLazysizes`を`true`にした場合は画像が表示されなくなるので注意
+
+&nbsp;
 
 **CommentAvatarTargetsSrc**
 
 |名前|意味合い|初期値|
 |---|---|---|
-|avatarClassName|アバター画像を格納する親要素でいて、`data-avatar-code`を記述した要素のクラス名|`comment_avatar`|
-|avatarImgClassName|アバター画像要素クラス名|`comment_avatar_img`|
-|avatarSelectButtonId|アバター選択ボタンid|`commentAvatarSelectButton`|
-|emailInputId|メールアドレス入力欄id|`commentFormMail`|
+|`avatarClassName`|アバター画像を格納する親要素でいて、`data-avatar-code`を記述した要素のクラス名|`comment_avatar`|
+|`avatarImgClassName`|アバター画像要素クラス名|`comment_avatar_img`|
+|`avatarSelectButtonId`|アバター選択ボタンid|`commentAvatarSelectButton`|
+|`emailInputId`|メールアドレス入力欄id|`commentFormMail`|
 
-**avatarsListの特殊な値**
+&nbsp;
 
-avatarListObjectの内容は`key`がアバター指定コード、`value`がアバター画像urlとして扱われる。
+**avatarsList**
+
+avatarListの内容は`key`がアバター指定コード、`value`がアバター画像urlとして扱われる。
+
+以下の表は特殊な値。
 
 |名前|意味合い|備考|
 |---|---|---|
 |`__default__`|デフォルトアバター|入力がなければ`https://static.fc2.com/image/sh_design/no_image/no_image_300x300.png`を初期値として使用する|
-|`__admin__`|管理者アバター|入力がなければ管理者アバター表示機能オフ|
-
-
-## 以下個人的なメモ帳
-
-仕様リスト（変更するかも）
-
-* ユーザーがアイコンの中から好きなものを選択（選択中のものをハイライト、もしくは「アイコンを変更する」ボタンを付ける）
-* アイコンが選択されているなら、そのアイコンと紐付けられた名前をメールアドレス欄に自動入力
-* （FC2の確認画面では`[[kitune]]`といった感じで表示される）
-* ページ読み込み時にjsで既存コメントメールアドレス欄をチェックして、特定の文字列であるなら画像リンクを書き換え。
-* 特定文字列とマッチしなかった場合、またはメールアドレス欄が空の場合は画像リンクは書き換えず、デフォルト画像を用いる。
-* 一度設定したアイコンはcookieに平文で保存されて、ページ読み込み時に自動入力される。
-* アイコン選択画面から再設定した場合は、cookie情報とメールアドレス欄情報を同時に書き換える
-* javascriptが無効化されてる際もデフォルト画像を表示
-* 初期デフォルト画像はfc2公式のもの。カスタムデフォルト画像ももちろんOK。
-
-## アバターの命名規則
-
-* `[[]]`で囲う
-* 例: `[[kitune]]`
+|`__admin__`|管理者アバター|入力がなければ管理者アバター表示機能オフとなる|
+|`__secret__`|非公開コメントのアバター|入力がなければ非公開コメントアバター表示機能はオフとなる|
